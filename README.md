@@ -1,5 +1,7 @@
 # Home Climate dashboard
 
+[![CI](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml)
+
 Mobile-first temperature and humidity dashboard for the house, reading from
 InfluxDB 3 and served over Tailscale at `https://dashboard.example.com`.
 
@@ -37,6 +39,19 @@ npm install
 npm run dev:server     # API on :8090, serves web/dist if built
 npm run dev:web        # Vite dev server on :5174, proxies /api to :8090
 ```
+
+## CI and dependencies
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+it builds the frontend, boots the server against a closed port to check that the
+registry renders, the build is served, and an unreachable InfluxDB degrades to a
+503 rather than killing the process, then builds the Docker image. Nothing is
+pushed to a registry — the host still deploys with `docker compose up --build`.
+
+Renovate opens the dependency PRs. Anything below a major bump merges itself
+once both CI jobs pass, after a three-day soak so a yanked release never lands
+unattended; majors and Node runtime bumps wait for a human. `main` requires both
+checks, with a bypass for the repo admin so direct pushes still work.
 
 ## Reverse proxy
 

@@ -28,6 +28,12 @@ something has run `build` (it logs a warning and skips static serving).
 There is no test suite, linter, or formatter configured. Don't invent commands
 for them; verify changes by running the app against the live database.
 
+CI (`.github/workflows/ci.yml`) is the only automated check: build the frontend,
+boot the server against a closed port and assert the four things that hold
+without InfluxDB, then build the image. Reproduce it locally with `npm run build`
+plus the smoke block from that file. If you add a job, add its `name` to the
+required checks in the `main` ruleset or Renovate will merge past it.
+
 `.env` supplies `influxdb_token` and is gitignored and dockerignored.
 `server/influx.js` accepts either `INFLUX_TOKEN` or `influxdb_token` and throws
 at startup if neither is set.
