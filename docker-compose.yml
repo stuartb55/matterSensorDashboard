@@ -1,0 +1,34 @@
+services:
+  dashboard:
+    build: .
+    image: sensor-dashboard
+    container_name: sensor-dashboard
+    restart: unless-stopped
+
+    # Caddy runs on a different tailnet node (caddy), so this has to be
+    # reachable across the tailnet rather than bound to loopback. This also
+    # exposes it to the machine's LAN — the same posture as the InfluxDB,
+    # Frigate and MQTT containers already running here. To make it tailnet-only
+    # instead, change this to "<dashboard-tailscale-ip>:8090:8090".
+    ports:
+      - "8090:8090"
+
+    # Supplies influxdb_token. Never baked into the image.
+    env_file:
+      - .env
+
+    environment:
+      # InfluxDB is a container on the same user-defined network, so it is
+      # addressed by container name — localhost:8181 would resolve to this
+      # container itself.
+      INFLUX_URL: http://influxdb3-enterprise:8181
+      PORT: "8090"
+      NODE_ENV: production
+
+    networks:
+      - influxdb
+
+networks:
+  influxdb:
+    external: true
+    name: docker_influxdb-network

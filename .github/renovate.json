@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommitTypeAll(chore)"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "platformAutomerge": true,
+  "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Anything below a major bump merges itself once CI is green.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Workflow actions move together and merge themselves.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "automerge": true
+    },
+    {
+      "description": "Majors land by hand. React, Vite and Fastify all ship breaking changes, and the smoke test is not broad enough to catch them.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "The runtime version is set in three places and they have to agree.",
+      "matchPackageNames": ["node"],
+      "groupName": "node runtime",
+      "automerge": false
+    }
+  ]
+}

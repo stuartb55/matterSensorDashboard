@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push supersedes whatever was still running for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and smoke-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # There is no test suite, so this is the safety net: it boots the real
+      # server against a closed port and asserts the behaviour that does not
+      # depend on InfluxDB — the registry renders, the build is served, and an
+      # unreachable upstream degrades to 503 instead of crashing the process.
+      - name: Smoke-test the server
+        env:
+          INFLUX_TOKEN: ci-placeholder
+          INFLUX_URL: http://127.0.0.1:9
+          PORT: "8090"
+        run: |
+          set -euo pipefail
+          node server/index.js &
+          pid=$!
+          trap 'kill $pid' EXIT
+
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8090/api/sensors >/dev/null && break
+            sleep 1
+          done
+
+          echo "registry is served"
+          curl -sf http://127.0.0.1:8090/api/sensors | grep -q '"living_room"'
+
+          echo "built frontend is served"
+          curl -sf http://127.0.0.1:8090/ | grep -q '<div id="root">'
+
+          echo "unreachable upstream reports unhealthy, not dead"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/health)" = 503
+
+          echo "unknown API paths 404 instead of falling back to the shell"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/api/nope)" = 404
+
+  docker:
+    name: Build image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Built but not pushed — the image is deployed by `docker compose up
+      # --build` on the host, so this only has to prove the Dockerfile works.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

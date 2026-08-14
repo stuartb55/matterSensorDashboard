@@ -1,0 +1,636 @@
+/* Design tokens: the validated reference palette, light and dark.
+   Dark steps are selected for the dark surface, not flipped from light. */
+
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05), 0 4px 12px rgba(11, 11, 11, 0.04);
+  --ghost: rgba(11, 11, 11, 0.04);
+
+  /* Categorical slots, fixed order. Assigned to rooms by identity. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  /* Status — reserved for state, never for a series. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --radius: 14px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --shadow: none;
+    --ghost: rgba(255, 255, 255, 0.06);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --shadow: none;
+  --ghost: rgba(255, 255, 255, 0.06);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page);
+  color: var(--text-primary);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  /* Stops iOS/Android rubber-band from revealing a differently coloured plane. */
+  overscroll-behavior-y: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px
+    calc(32px + env(safe-area-inset-bottom));
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 2px 18px;
+}
+
+.masthead h1 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.masthead .status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-good);
+  flex: none;
+}
+.dot.warn {
+  background: var(--status-warning);
+}
+.dot.bad {
+  background: var(--status-critical);
+}
+
+/* Single filter row, above everything it scopes. */
+.filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 2px 16px;
+  scrollbar-width: none;
+}
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.range-btn {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.range-btn[aria-pressed='true'] {
+  background: var(--text-primary);
+  color: var(--surface-1);
+  border-color: var(--text-primary);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 26px 2px 10px;
+}
+.section-head h2 {
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  /* minmax(0,1fr) rather than 1fr: an auto minimum lets wide content push a
+     track past the viewport. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+@media (min-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ------------------------------------------------------------ stat tiles */
+
+.card {
+  position: relative;
+  min-width: 0;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px 10px;
+  box-shadow: var(--shadow);
+  min-height: 44px;
+  transition: opacity 0.2s;
+}
+.card:active {
+  background: var(--ghost);
+}
+.card.is-stale {
+  opacity: 0.62;
+}
+
+.card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-label {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.card-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-top: 6px;
+}
+.card-temp {
+  /* Proportional figures: tabular would make a big number look loose. */
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.card-unit {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.card-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.card-spark {
+  margin-top: 8px;
+  height: 34px;
+}
+
+/* ---------------------------------------------------------------- charts */
+
+.panel {
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px 10px;
+  box-shadow: var(--shadow);
+}
+
+.panel-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 2px 4px;
+}
+.panel-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 0 0 10px 4px;
+}
+
+/* Refetch holds the previous render — no skeleton flash, no layout jump. */
+.is-refetching {
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+
+.chart-host {
+  width: 100%;
+  position: relative;
+  /* uPlot's own stylesheet sets `.uplot { width: min-content }`, which would
+     otherwise stretch the whole page past the viewport. The canvas is sized
+     explicitly from a ResizeObserver, so overriding this is safe — and the
+     min-width/overflow pair stops the observer from feeding a growing width
+     back into itself. */
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chart-host .uplot {
+  width: 100%;
+  min-width: 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 10px 4px 2px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  min-height: 24px;
+}
+.legend-key {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  flex: none;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  font-size: 0.78rem;
+  min-width: 130px;
+  transform: translate(-50%, calc(-100% - 14px));
+  transition: opacity 0.1s;
+}
+.tooltip-time {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 1px 0;
+}
+.tooltip-key {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  flex: none;
+}
+/* Values lead, labels follow — the reader has the series, wants the number. */
+.tooltip-val {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+.tooltip-name {
+  color: var(--text-secondary);
+}
+
+/* ----------------------------------------------------------- detail view */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  z-index: 40;
+  animation: fade 0.15s ease-out;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 41;
+  max-height: 92dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--page);
+  border-radius: 18px 18px 0 0;
+  padding: 6px 14px calc(28px + env(safe-area-inset-bottom));
+  animation: rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0.4;
+  }
+}
+@media (min-width: 700px) {
+  .sheet {
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    width: min(680px, 94vw);
+    max-height: 88dvh;
+    border-radius: 18px;
+  }
+}
+
+.grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--axis);
+  margin: 8px auto 12px;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.sheet-now {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.hero {
+  font-size: 2.6rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  flex: none;
+}
+.icon-btn:active {
+  background: var(--ghost);
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.stat {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 11px;
+}
+.stat dt {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 3px;
+}
+.stat dd {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.link-btn {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 44px;
+  padding: 0 4px;
+}
+
+/* Table view: the WCAG-clean twin of every chart. */
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+th,
+td {
+  text-align: right;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--gridline);
+  white-space: nowrap;
+}
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.notice {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notice.error {
+  border-color: color-mix(in srgb, var(--status-critical) 40%, var(--border));
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  padding: 22px 4px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
