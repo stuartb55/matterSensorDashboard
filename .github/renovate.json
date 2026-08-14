@@ -31,6 +31,16 @@
       "matchPackageNames": ["node"],
       "groupName": "node runtime",
       "automerge": false
+    },
+    {
+      "description": "The React plugin carries a peer range on Vite, so bumping either one alone fails to resolve. They move as a pair.",
+      "matchPackageNames": ["vite", "@vitejs/plugin-react"],
+      "groupName": "vite toolchain"
+    },
+    {
+      "description": "React and its DOM renderer are versioned in lockstep.",
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "groupName": "react"
     }
   ]
 }
