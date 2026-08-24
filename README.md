@@ -24,9 +24,20 @@ long as it belongs to one of the two sources already described in `SOURCES`.
 
 ## Running it
 
+CI publishes the image to GitHub Packages, so the host pulls rather than builds:
+
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
+
+`docker compose up -d --build` still builds from the checkout when a change has
+not been pushed yet. The package is
+[`ghcr.io/stuartb55/sensordashboard`](https://github.com/stuartb55/sensorDashboard/pkgs/container/sensordashboard),
+tagged `latest` plus `sha-<commit>` for every build — pin a sha tag in
+`docker-compose.yml` to roll back. A private package needs
+`echo $TOKEN | docker login ghcr.io -u stuartb55 --password-stdin` on the host
+first, with a PAT carrying `read:packages`; making the package public removes
+that step.
 
 The container joins the existing `docker_influxdb-network` and reaches InfluxDB
 by container name. `.env` supplies `influxdb_token` and is never baked into the
@@ -45,8 +56,11 @@ npm run dev:web        # Vite dev server on :5174, proxies /api to :8090
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
 it builds the frontend, boots the server against a closed port to check that the
 registry renders, the build is served, and an unreachable InfluxDB degrades to a
-503 rather than killing the process, then builds the Docker image. Nothing is
-pushed to a registry — the host still deploys with `docker compose up --build`.
+503 rather than killing the process, then builds the Docker image. Pushes to
+`main` publish that image to GitHub Packages with `GITHUB_TOKEN`; pull requests
+build it and stop, so an unreviewed branch never becomes `:latest`. The image
+job runs after the smoke test, so nothing untested is published. `linux/amd64`
+only — add to `platforms` in the workflow if the deployment host ever changes.
 
 Renovate opens the dependency PRs. Anything below a major bump merges itself
 once both CI jobs pass, after a three-day soak so a yanked release never lands

@@ -19,7 +19,8 @@ npm run dev:web      # Vite on :5174, proxies /api and /health to :8090
 npm run build        # Vite build -> web/dist
 npm start            # production entry; expects the token already in the environment
 
-docker compose up -d --build   # joins the external docker_influxdb-network
+docker compose pull && docker compose up -d   # deploy the published image
+docker compose up -d --build                 # build locally instead
 ```
 
 Typical loop is both dev servers at once — `dev:server` alone is API-only until
@@ -33,6 +34,11 @@ boot the server against a closed port and assert the four things that hold
 without InfluxDB, then build the image. Reproduce it locally with `npm run build`
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
+
+Pushes to `main` publish the image to `ghcr.io/stuartb55/sensordashboard`
+(`latest` and `sha-<commit>`); pull requests build it without pushing. The
+image job `needs: build`, so an image is only published once the smoke test has
+passed.
 
 `.env` supplies `influxdb_token` and is gitignored and dockerignored.
 `server/influx.js` accepts either `INFLUX_TOKEN` or `influxdb_token` and throws
@@ -111,6 +117,10 @@ the live database.
 
 - The container reaches InfluxDB by container name on `docker_influxdb-network`;
   `localhost:8181` would resolve to the dashboard container itself.
+- `docker-compose.yml` carries both `image:` (the GHCR package, `pull_policy:
+  always`) and `build:`. Plain `up -d` deploys what CI published; `--build`
+  builds the checkout and tags it with the same name. GHCR image names must be
+  lowercase, hence `sensordashboard`, not `sensorDashboard`.
 - `/health` runs `SELECT 1` rather than InfluxDB's `/ping`, which needs a
   system-level token this one doesn't have. Its probe timeout (4s) is
   deliberately under the container healthcheck timeout (5s).
