@@ -59,8 +59,11 @@ registry renders, the build is served, and an unreachable InfluxDB degrades to a
 503 rather than killing the process, then builds the Docker image. Pushes to
 `main` publish that image to GitHub Packages with `GITHUB_TOKEN`; pull requests
 build it and stop, so an unreviewed branch never becomes `:latest`. The image
-job runs after the smoke test, so nothing untested is published. `linux/amd64`
-only — add to `platforms` in the workflow if the deployment host ever changes.
+job runs after the smoke test, so nothing untested is published. It is a
+multi-platform image (`linux/amd64` and `linux/arm64`), because a manifest
+missing the host's architecture fails `docker compose pull` outright; the arm64
+leg is emulated, but only for the runtime stage, since the frontend build stage
+is pinned to the builder's architecture.
 
 Renovate opens the dependency PRs. Anything below a major bump merges itself
 once both CI jobs pass, after a three-day soak so a yanked release never lands

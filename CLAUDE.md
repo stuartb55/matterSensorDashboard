@@ -38,7 +38,9 @@ required checks in the `main` ruleset or Renovate will merge past it.
 Pushes to `main` publish the image to `ghcr.io/stuartb55/sensordashboard`
 (`latest` and `sha-<commit>`); pull requests build it without pushing. The
 image job `needs: build`, so an image is only published once the smoke test has
-passed.
+passed. It is built for `linux/amd64` and `linux/arm64` — the deployment host
+is Apple silicon, and dropping either one makes `docker compose pull` fail with
+"no matching manifest" on that architecture.
 
 `.env` supplies `influxdb_token` and is gitignored and dockerignored.
 `server/influx.js` accepts either `INFLUX_TOKEN` or `influxdb_token` and throws

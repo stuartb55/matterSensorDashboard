@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1
 
 # ---- build the frontend bundle -------------------------------------------
-FROM node:24-alpine AS build
+# Pinned to the builder's own architecture: `web/dist` is plain JS, so there is
+# nothing to gain from running Vite under emulation on the arm64 leg of a
+# multi-platform build, and plenty of minutes to lose.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./

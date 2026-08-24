@@ -78,6 +78,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # arm64 is emulated. Only the runtime stage runs under it — the frontend
+      # build stage is pinned to the builder's own architecture — and the
+      # runtime dependencies are pure JavaScript, so the emulated work is one
+      # `npm ci --omit=dev`.
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
       - uses: docker/setup-buildx-action@v4
 
       # Pull requests build and stop there — a fork PR has no write access to
@@ -105,13 +113,14 @@ jobs:
           labels: |
             org.opencontainers.image.description=Mobile-first temperature and humidity dashboard reading from InfluxDB 3
 
-      # The deployment host is x86; add linux/arm64 to `platforms` if that ever
-      # stops being true. Emulated arm64 builds are slow, so it is not on by
-      # default.
+      # The deployment host is arm64 (Apple silicon); amd64 stays so the image
+      # still runs on an x86 host. A single-platform image makes `docker
+      # compose pull` fail on the other architecture with "no matching
+      # manifest", which is how this list last went wrong.
       - uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
