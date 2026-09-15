@@ -9,6 +9,16 @@ import DetailSheet from './components/DetailSheet.jsx';
 const LATEST_POLL_MS = 30_000;
 const HISTORY_POLL_MS = 120_000;
 
+function OfflineNote({ count }) {
+  if (!count) return null;
+  return (
+    <span className="card-note">
+      <span className="dot bad" aria-hidden="true" />
+      {count} offline
+    </span>
+  );
+}
+
 export default function App() {
   const [range, setRange] = useState('24h');
   const [readings, setReadings] = useState(null);
@@ -111,6 +121,9 @@ export default function App() {
     null,
   );
   const offline = readings?.filter((r) => r.stale).length ?? 0;
+  const roomsOffline = rooms.filter((r) => r.stale).length;
+  const doorsOffline = doors.filter((r) => r.stale).length;
+  const equipmentOffline = equipment.filter((r) => r.stale).length;
 
   return (
     <div className="app">
@@ -157,12 +170,7 @@ export default function App() {
         <div className={refetching ? 'is-refetching' : undefined}>
           <div className="section-head">
             <h2>Rooms</h2>
-            {offline > 0 && (
-              <span className="card-note">
-                <span className="dot bad" aria-hidden="true" />
-                {offline} offline
-              </span>
-            )}
+            <OfflineNote count={roomsOffline} />
           </div>
           <div className="grid">
             {rooms.map((r) => (
@@ -181,6 +189,7 @@ export default function App() {
             <>
               <div className="section-head">
                 <h2>Doors</h2>
+                <OfflineNote count={doorsOffline} />
               </div>
               <div className="grid">
                 {doors.map((r) => (
@@ -194,6 +203,7 @@ export default function App() {
             <>
               <div className="section-head">
                 <h2>Equipment</h2>
+                <OfflineNote count={equipmentOffline} />
               </div>
               <div className="grid">
                 {equipment.map((r) => (
