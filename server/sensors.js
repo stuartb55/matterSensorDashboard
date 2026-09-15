@@ -47,8 +47,8 @@ export const SENSORS = [
   { id: 'kitchen', label: 'Kitchen', kind: 'room', source: 'matter', key: 'Kitchen' },
   { id: 'hallway', label: 'Hallway', kind: 'room', source: 'matter', key: 'Hallway' },
   { id: 'closet', label: 'Closet', kind: 'room', source: 'matter', key: 'Closet' },
-  // Contact state is event-driven; the latest known state is kept separately
-  // from the sensor's periodic check-in so a closed door does not go blank.
+  // Contact state is event-driven, so its latest known state is retained
+  // without treating the time since it changed as an outage.
   {
     id: 'garage',
     label: 'Garage',
@@ -57,7 +57,6 @@ export const SENSORS = [
     // IKEA MYGGBETT contact sensor: node_id 6, endpoint 1.
     key: 'Garage',
     noBattery: true,
-    staleAfterSec: 4 * 3600,
   },
   {
     id: 'back_door',
@@ -66,7 +65,6 @@ export const SENSORS = [
     source: 'matter',
     key: 'BackDoor',
     noBattery: true,
-    staleAfterSec: 4 * 3600,
   },
 ];
 

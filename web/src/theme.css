@@ -262,10 +262,6 @@ button {
   box-shadow: var(--shadow);
   min-height: 44px;
 }
-.door-card.is-stale {
-  opacity: 0.62;
-}
-
 .door-state {
   display: flex;
   align-items: center;

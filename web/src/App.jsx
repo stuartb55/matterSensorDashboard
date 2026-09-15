@@ -122,7 +122,6 @@ export default function App() {
   );
   const offline = readings?.filter((r) => r.stale).length ?? 0;
   const roomsOffline = rooms.filter((r) => r.stale).length;
-  const doorsOffline = doors.filter((r) => r.stale).length;
   const equipmentOffline = equipment.filter((r) => r.stale).length;
 
   return (
@@ -172,7 +171,6 @@ export default function App() {
             <>
               <div className="section-head">
                 <h2>Doors</h2>
-                <OfflineNote count={doorsOffline} />
               </div>
               <div className="grid door-grid">
                 {doors.map((r) => (

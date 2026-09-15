@@ -80,8 +80,7 @@ async function latestMatter(sensors) {
       max(${src.temp}) FILTER (WHERE trank = 1) AS temp,
       max(${src.hum})  FILTER (WHERE hrank = 1) AS hum,
       max(${src.batt}) FILTER (WHERE brank = 1) AS batt,
-      max(time) FILTER (WHERE trank = 1) AS time,
-      max(time) AS seen_time
+      max(time) FILTER (WHERE trank = 1) AS time
     FROM (
       SELECT ${src.tag}, ${src.temp}, ${src.hum}, ${src.batt}, time,
         ${rank(src.temp, 'trank')},
@@ -98,8 +97,7 @@ async function latestMatter(sensors) {
 /**
  * A contact sensor writes only when its state changes, so its current state
  * may be much older than the normal latest-reading lookback. Fetch that state
- * independently while latestMatter() still supplies the periodic check-in
- * used for staleness.
+ * independently; an unchanged door is not considered stale.
  */
 async function latestDoorStates(sensors) {
   if (!sensors.length) return [];
@@ -123,7 +121,7 @@ export async function fetchLatest() {
   const doors = SENSORS.filter((sensor) => sensor.kind === 'door');
   const [ruuviRows, matterRows, doorStateRows] = await Promise.all([
     latestRuuvi(sensorsForSource('ruuvi')),
-    latestMatter(sensorsForSource('matter')),
+    latestMatter(sensorsForSource('matter').filter((sensor) => sensor.kind !== 'door')),
     latestDoorStates(doors),
   ]);
 
@@ -146,11 +144,13 @@ export async function fetchLatest() {
   return SENSORS.map((sensor) => {
     const row = readings.get(sensor.id);
     const state = doorStates.get(sensor.id);
-    // Temperature readings timestamp climate sensors; a door's periodic
-    // battery/check-in rows timestamp its health separately from its state.
-    const ts = row ? parseInfluxTime(sensor.kind === 'door' ? row.seen_time : row.time) : null;
+    // Door contacts are event-driven. Only climate sensors have a freshness
+    // timestamp; an unchanged door remains valid regardless of its age.
+    const ts = sensor.kind === 'door' ? null : row ? parseInfluxTime(row.time) : null;
     const ageSec = ts == null ? null : Math.max(0, Math.round((now - ts) / 1000));
-    const staleAfter = sensor.staleAfterSec ?? SOURCES[sensor.source].staleAfterSec;
+    const stale = sensor.kind !== 'door' && (
+      ageSec == null || ageSec > (sensor.staleAfterSec ?? SOURCES[sensor.source].staleAfterSec)
+    );
     const stateTs = state ? parseInfluxTime(state.state_time) : null;
     return {
       id: sensor.id,
@@ -165,7 +165,7 @@ export async function fetchLatest() {
       stateTs,
       ts,
       ageSec,
-      stale: ageSec == null || ageSec > staleAfter,
+      stale,
     };
   });
 }
