@@ -50,11 +50,12 @@ export const SENSORS = [
   // Contact state is event-driven; the latest known state is kept separately
   // from the sensor's periodic check-in so a closed door does not go blank.
   {
-    id: 'front_door',
-    label: 'Front Door',
+    id: 'garage',
+    label: 'Garage',
     kind: 'door',
     source: 'matter',
-    key: 'FrontDoor',
+    // IKEA MYGGBETT contact sensor: node_id 6, endpoint 1.
+    key: 'Garage',
     noBattery: true,
     staleAfterSec: 4 * 3600,
   },

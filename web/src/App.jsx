@@ -168,6 +168,20 @@ export default function App() {
         <p className="empty">{error ? 'No readings available.' : 'Loading sensors…'}</p>
       ) : (
         <div className={refetching ? 'is-refetching' : undefined}>
+          {doors.length > 0 && (
+            <>
+              <div className="section-head">
+                <h2>Doors</h2>
+                <OfflineNote count={doorsOffline} />
+              </div>
+              <div className="grid door-grid">
+                {doors.map((r) => (
+                  <DoorCard key={r.id} reading={r} />
+                ))}
+              </div>
+            </>
+          )}
+
           <div className="section-head">
             <h2>Rooms</h2>
             <OfflineNote count={roomsOffline} />
@@ -184,20 +198,6 @@ export default function App() {
               />
             ))}
           </div>
-
-          {doors.length > 0 && (
-            <>
-              <div className="section-head">
-                <h2>Doors</h2>
-                <OfflineNote count={doorsOffline} />
-              </div>
-              <div className="grid">
-                {doors.map((r) => (
-                  <DoorCard key={r.id} reading={r} />
-                ))}
-              </div>
-            </>
-          )}
 
           {equipment.length > 0 && (
             <>

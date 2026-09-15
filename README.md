@@ -15,13 +15,17 @@ Eleven sensors across two databases, unified by the registry in
 | Living Room, Bedroom, Office, Ruuvi Air | RuuviTag (~1 reading/sec) | `ruuvi.ruuvi_measurements` |
 | Bathroom, Kitchen, Hallway, Closet | IKEA TIMMERFLOTTE over Matter (~6 min) | `matter.matter` |
 | Hot Water | RuuviTag on the tank | `ruuvi.ruuvi_measurements` |
-| Front Door, Back Door | Aqara contact sensor over Matter | `matter.matter` |
+| Garage, Back Door | IKEA MYGGBETT contact sensor over Matter | `matter.matter` |
 
 Hot Water is marked `kind: "equipment"`: it sits near 47 °C while rooms sit near
 25 °C, so it gets its own card section and is kept off the shared room scale.
 Door contacts are marked `kind: "door"` and show their last known open/closed
 state. Because they only report that state when it changes, it is retained even
 when the periodic check-in has gone stale.
+
+The Garage sensor is Matter node `Garage` (node ID `6`, endpoint `1`). Its
+`contact_closed` field is a float: `1.0` means the garage door is shut and
+`0.0` means it is open.
 
 Adding a sensor is a one-line change to `SENSORS` in `server/sensors.js` — as
 long as it belongs to one of the two sources already described in `SOURCES`.
