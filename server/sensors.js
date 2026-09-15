@@ -25,6 +25,7 @@ export const SOURCES = {
     temp: 'temperature_c',
     hum: 'humidity_pct',
     batt: 'battery_pct',
+    contact: 'contact_closed',
     battKind: 'pct',
     // IKEA sensors average a reading every ~6 min, but measured gaps reach 29
     // min in normal operation. Threshold sits well above that so ordinary
@@ -46,6 +47,26 @@ export const SENSORS = [
   { id: 'kitchen', label: 'Kitchen', kind: 'room', source: 'matter', key: 'Kitchen' },
   { id: 'hallway', label: 'Hallway', kind: 'room', source: 'matter', key: 'Hallway' },
   { id: 'closet', label: 'Closet', kind: 'room', source: 'matter', key: 'Closet' },
+  // Contact state is event-driven; the latest known state is kept separately
+  // from the sensor's periodic check-in so a closed door does not go blank.
+  {
+    id: 'front_door',
+    label: 'Front Door',
+    kind: 'door',
+    source: 'matter',
+    key: 'FrontDoor',
+    noBattery: true,
+    staleAfterSec: 4 * 3600,
+  },
+  {
+    id: 'back_door',
+    label: 'Back Door',
+    kind: 'door',
+    source: 'matter',
+    key: 'BackDoor',
+    noBattery: true,
+    staleAfterSec: 4 * 3600,
+  },
 ];
 
 const BY_SOURCE_KEY = new Map(SENSORS.map((s) => [`${s.source}:${s.key}`, s]));

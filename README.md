@@ -7,17 +7,21 @@ InfluxDB 3 and served over Tailscale at `https://dashboard.example.com`.
 
 ## Sensors
 
-Nine sensors across two databases, unified by the registry in
+Eleven sensors across two databases, unified by the registry in
 `server/sensors.js`:
 
-| Room | Source | Database |
+| Device | Source | Database |
 |---|---|---|
 | Living Room, Bedroom, Office, Ruuvi Air | RuuviTag (~1 reading/sec) | `ruuvi.ruuvi_measurements` |
 | Bathroom, Kitchen, Hallway, Closet | IKEA TIMMERFLOTTE over Matter (~6 min) | `matter.matter` |
 | Hot Water | RuuviTag on the tank | `ruuvi.ruuvi_measurements` |
+| Front Door, Back Door | Aqara contact sensor over Matter | `matter.matter` |
 
 Hot Water is marked `kind: "equipment"`: it sits near 47 °C while rooms sit near
 25 °C, so it gets its own card section and is kept off the shared room scale.
+Door contacts are marked `kind: "door"` and show their last known open/closed
+state. Because they only report that state when it changes, it is retained even
+when the periodic check-in has gone stale.
 
 Adding a sensor is a one-line change to `SENSORS` in `server/sensors.js` — as
 long as it belongs to one of the two sources already described in `SOURCES`.

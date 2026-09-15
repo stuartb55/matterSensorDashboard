@@ -49,7 +49,7 @@ at startup if neither is set.
 ## Architecture
 
 **The sensor registry is the spine.** `server/sensors.js` holds `SOURCES` (the
-two upstream schemas) and `SENSORS` (nine devices). Everything else — SQL
+two upstream schemas) and `SENSORS` (eleven devices). Everything else — SQL
 generation, response shaping, staleness, battery units, the public `/api/sensors`
 payload — derives from it. Adding a sensor from an existing source is a one-line
 change there and nothing else. `publicRegistry()` is the boundary that keeps
@@ -69,9 +69,11 @@ that have gone quiet — sensors never vanish from the UI.
 **The history contract.** `fetchHistory()` returns
 `{ range, bucketSec, t[], series[] }`, where `t` is an evenly spaced,
 epoch-anchored axis (matching `date_bin`) and every series is padded to its full
-length with **nulls, not zeros**. Each series also carries `bridgeSec` — the
-longest silence that is normal for that sensor. The whole frontend assumes this
-shared axis; charts, sparklines and tables index into it directly.
+length with **nulls, not zeros**. Each climate series also carries `bridgeSec`
+— the longest silence that is normal for that sensor. Door contacts are
+event-driven state, not climate series, so they are deliberately excluded.
+The whole frontend assumes this shared axis; charts, sparklines and tables index
+into it directly.
 
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on

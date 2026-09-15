@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getHistory, getLatest, RANGES } from './api.js';
 import { fmtAge } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
+import DoorCard from './components/DoorCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 
@@ -102,6 +103,7 @@ export default function App() {
   const rangeLabel = RANGES.find((r) => r.key === range)?.label.toLowerCase() ?? range;
   const rooms = readings?.filter((r) => r.kind === 'room') ?? [];
   const equipment = readings?.filter((r) => r.kind === 'equipment') ?? [];
+  const doors = readings?.filter((r) => r.kind === 'door') ?? [];
   const selectedReading = readings?.find((r) => r.id === selected) ?? null;
 
   const freshest = readings?.reduce(
@@ -174,6 +176,19 @@ export default function App() {
               />
             ))}
           </div>
+
+          {doors.length > 0 && (
+            <>
+              <div className="section-head">
+                <h2>Doors</h2>
+              </div>
+              <div className="grid">
+                {doors.map((r) => (
+                  <DoorCard key={r.id} reading={r} />
+                ))}
+              </div>
+            </>
+          )}
 
           {equipment.length > 0 && (
             <>

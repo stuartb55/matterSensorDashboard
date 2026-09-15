@@ -245,6 +245,47 @@ button {
   opacity: 0.62;
 }
 
+.door-card {
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  min-height: 44px;
+}
+.door-card.is-stale {
+  opacity: 0.62;
+}
+
+.door-state {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.door-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.door-state.is-closed .door-indicator {
+  background: var(--status-good);
+}
+.door-state.is-open .door-indicator {
+  background: var(--status-serious);
+}
+.door-sub {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
 .card-top {
   display: flex;
   align-items: baseline;

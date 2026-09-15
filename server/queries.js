@@ -80,7 +80,8 @@ async function latestMatter(sensors) {
       max(${src.temp}) FILTER (WHERE trank = 1) AS temp,
       max(${src.hum})  FILTER (WHERE hrank = 1) AS hum,
       max(${src.batt}) FILTER (WHERE brank = 1) AS batt,
-      max(time) FILTER (WHERE trank = 1) AS time
+      max(time) FILTER (WHERE trank = 1) AS time,
+      max(time) AS seen_time
     FROM (
       SELECT ${src.tag}, ${src.temp}, ${src.hum}, ${src.batt}, time,
         ${rank(src.temp, 'trank')},
@@ -95,14 +96,35 @@ async function latestMatter(sensors) {
 }
 
 /**
+ * A contact sensor writes only when its state changes, so its current state
+ * may be much older than the normal latest-reading lookback. Fetch that state
+ * independently while latestMatter() still supplies the periodic check-in
+ * used for staleness.
+ */
+async function latestDoorStates(sensors) {
+  if (!sensors.length) return [];
+  const src = SOURCES.matter;
+  const sql = `
+    SELECT DISTINCT ON (${src.tag})
+      ${src.tag} AS key, ${src.contact} AS closed, time AS state_time
+    FROM ${src.table}
+    WHERE ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
+      AND ${src.contact} IS NOT NULL
+    ORDER BY ${src.tag}, time DESC`;
+  return query(src.db, sql);
+}
+
+/**
  * Current reading for every registered sensor, normalised across both sources.
  * Sensors with no recent data are still returned, with null values, so the UI
  * can show them as offline.
  */
 export async function fetchLatest() {
-  const [ruuviRows, matterRows] = await Promise.all([
+  const doors = SENSORS.filter((sensor) => sensor.kind === 'door');
+  const [ruuviRows, matterRows, doorStateRows] = await Promise.all([
     latestRuuvi(sensorsForSource('ruuvi')),
     latestMatter(sensorsForSource('matter')),
+    latestDoorStates(doors),
   ]);
 
   const readings = new Map();
@@ -114,12 +136,22 @@ export async function fetchLatest() {
     }
   }
 
+  const doorStates = new Map();
+  for (const row of doorStateRows) {
+    const sensor = lookup('matter', row.key);
+    if (sensor?.kind === 'door') doorStates.set(sensor.id, row);
+  }
+
   const now = Date.now();
   return SENSORS.map((sensor) => {
     const row = readings.get(sensor.id);
-    const ts = row ? parseInfluxTime(row.time) : null;
+    const state = doorStates.get(sensor.id);
+    // Temperature readings timestamp climate sensors; a door's periodic
+    // battery/check-in rows timestamp its health separately from its state.
+    const ts = row ? parseInfluxTime(sensor.kind === 'door' ? row.seen_time : row.time) : null;
     const ageSec = ts == null ? null : Math.max(0, Math.round((now - ts) / 1000));
-    const staleAfter = SOURCES[sensor.source].staleAfterSec;
+    const staleAfter = sensor.staleAfterSec ?? SOURCES[sensor.source].staleAfterSec;
+    const stateTs = state ? parseInfluxTime(state.state_time) : null;
     return {
       id: sensor.id,
       label: sensor.label,
@@ -129,6 +161,8 @@ export async function fetchLatest() {
       battery: sensor.noBattery ? null : row?.batt ?? null,
       batteryKind: SOURCES[sensor.source].battKind,
       rssi: row?.rssi ?? null,
+      closed: sensor.kind === 'door' && state?.closed != null ? state.closed !== 0 : null,
+      stateTs,
       ts,
       ageSec,
       stale: ageSec == null || ageSec > staleAfter,
@@ -170,7 +204,10 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
   if (!RANGES[range]) throw new Error(`unknown range: ${range}`);
   const { bucketSec, spanSec } = RANGES[range];
 
-  const wanted = ids?.length ? SENSORS.filter((s) => ids.includes(s.id)) : SENSORS;
+  // Contact state changes are discrete events, not a temperature/humidity
+  // series. Keeping doors out of this contract avoids presenting null charts.
+  const wanted = (ids?.length ? SENSORS.filter((s) => ids.includes(s.id)) : SENSORS)
+    .filter((s) => s.kind !== 'door');
   if (!wanted.length) return { range, bucketSec, t: [], series: [] };
 
   const [ruuviRows, matterRows] = await Promise.all([
