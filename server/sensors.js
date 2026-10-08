@@ -15,6 +15,8 @@ export const SOURCES = {
     // and fails with "No field named batteryvoltage".
     batt: '"batteryVoltage"',
     battKind: 'volts',
+    // Only the Ruuvi Air carries a CO2 sensor; other tags leave this null.
+    co2: 'co2',
     // Ruuvi tags broadcast roughly once a second.
     staleAfterSec: 120,
   },
@@ -39,7 +41,7 @@ export const SENSORS = [
   { id: 'bedroom', label: 'Bedroom', kind: 'room', source: 'ruuvi', key: 'Bedroom' },
   { id: 'office', label: 'Office', kind: 'room', source: 'ruuvi', key: 'Office' },
   // Mains-powered, so it never reports a battery voltage.
-  { id: 'ruuvi_air', label: 'Ruuvi Air', kind: 'room', source: 'ruuvi', key: 'RuuviAir', noBattery: true },
+  { id: 'ruuvi_air', label: 'Ruuvi Air', kind: 'room', source: 'ruuvi', key: 'RuuviAir', noBattery: true, hasCo2: true },
   // Hot water tank: sits near 47C while rooms sit near 25C. Kept out of the
   // shared room scale so it doesn't flatten every room curve.
   { id: 'hot_water', label: 'Hot Water', kind: 'equipment', source: 'ruuvi', key: 'HotWater' },
