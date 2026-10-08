@@ -35,7 +35,7 @@ without InfluxDB, then build the image. Reproduce it locally with `npm run build
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
 
-Pushes to `main` publish the image to `ghcr.io/stuartb55/sensordashboard`
+Pushes to `main` publish the image to `ghcr.io/stuartb55/mattersensordashboard`
 (`latest` and `sha-<commit>`); pull requests build it without pushing. The
 image job `needs: build`, so an image is only published once the smoke test has
 passed. It is built for `linux/amd64` and `linux/arm64` — the deployment host
@@ -127,7 +127,7 @@ the live database.
 - `docker-compose.yml` carries both `image:` (the GHCR package, `pull_policy:
   always`) and `build:`. Plain `up -d` deploys what CI published; `--build`
   builds the checkout and tags it with the same name. GHCR image names must be
-  lowercase, hence `sensordashboard`, not `sensorDashboard`.
+  lowercase, hence `mattersensordashboard`, not `matterSensorDashboard`.
 - `/health` runs `SELECT 1` rather than InfluxDB's `/ping`, which needs a
   system-level token this one doesn't have. Its probe timeout (4s) is
   deliberately under the container healthcheck timeout (5s).

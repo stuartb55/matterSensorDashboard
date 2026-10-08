@@ -4,9 +4,9 @@ services:
     # deploys with `docker compose pull && docker compose up -d` instead of
     # compiling the frontend here. `--build` still builds from this checkout
     # when iterating locally, and pinning a `:sha-<commit>` tag from
-    # https://github.com/stuartb55/sensorDashboard/pkgs/container/sensordashboard
+    # https://github.com/stuartb55/matterSensorDashboard/pkgs/container/mattersensordashboard
     # rolls back to any earlier build.
-    image: ghcr.io/stuartb55/sensordashboard:latest
+    image: ghcr.io/stuartb55/mattersensordashboard:latest
     pull_policy: always
     build: .
     container_name: sensor-dashboard

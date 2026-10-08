@@ -1,6 +1,6 @@
 # Home Climate dashboard
 
-[![CI](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml)
+[![CI](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml)
 
 Mobile-first temperature and humidity dashboard for the house, reading from
 InfluxDB 3 and served over Tailscale behind a Caddy reverse proxy.
@@ -40,7 +40,7 @@ docker compose pull && docker compose up -d
 
 `docker compose up -d --build` still builds from the checkout when a change has
 not been pushed yet. The package is
-[`ghcr.io/stuartb55/sensordashboard`](https://github.com/stuartb55/sensorDashboard/pkgs/container/sensordashboard),
+[`ghcr.io/stuartb55/mattersensordashboard`](https://github.com/stuartb55/matterSensorDashboard/pkgs/container/mattersensordashboard),
 tagged `latest` plus `sha-<commit>` for every build — pin a sha tag in
 `docker-compose.yml` to roll back. A private package needs
 `echo $TOKEN | docker login ghcr.io -u stuartb55 --password-stdin` on the host
