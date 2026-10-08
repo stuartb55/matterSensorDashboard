@@ -2,8 +2,7 @@
 
 [![CI](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml)
 
-Mobile-first temperature and humidity dashboard for the house, reading from
-InfluxDB 3 and served over Tailscale behind a Caddy reverse proxy.
+Mobile-first temperature and humidity dashboard for the house, reading from InfluxDB 3
 
 ## Sensors
 
@@ -78,19 +77,6 @@ once both CI jobs pass, after a three-day soak so a yanked release never lands
 unattended; majors and Node runtime bumps wait for a human. `main` requires both
 checks, with a bypass for the repo admin so direct pushes still work.
 
-## Reverse proxy
-
-Caddy runs on a separate tailnet node, so it reaches this machine over the
-tailnet. Substitute your own hostname and this machine's Tailscale IP:
-
-```
-dashboard.example.com {
-    reverse_proxy <dashboard-tailscale-ip>:8090
-}
-```
-
-HTTPS from Caddy is what makes the dashboard installable as a PWA.
-
 ## API
 
 | Endpoint | Returns |
@@ -136,15 +122,3 @@ querying the live database. `server/queries.js` depends on all of them.
   a dashed line. Genuine outages stay visible as gaps, and **statistics and
   table views always use the raw series** — no interpolated value is ever shown
   as a reading.
-
-## Security
-
-The dashboard has no authentication of its own; Tailscale plus Caddy is the
-boundary. Two things to be aware of:
-
-- Publishing `8090` on `0.0.0.0` also exposes it to this machine's LAN. For
-  tailnet-only, change the port mapping in `docker-compose.yml` to
-  `<dashboard-tailscale-ip>:8090:8090`.
-- The admin token is currently used for reads. A read-only token scoped to the
-  `ruuvi` and `matter` databases would be a drop-in replacement for
-  `influxdb_token` in `.env`.
