@@ -3,7 +3,7 @@
 [![CI](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/sensorDashboard/actions/workflows/ci.yml)
 
 Mobile-first temperature and humidity dashboard for the house, reading from
-InfluxDB 3 and served over Tailscale at `https://dashboard.example.com`.
+InfluxDB 3 and served over Tailscale behind a Caddy reverse proxy.
 
 ## Sensors
 
@@ -47,9 +47,9 @@ tagged `latest` plus `sha-<commit>` for every build — pin a sha tag in
 first, with a PAT carrying `read:packages`; making the package public removes
 that step.
 
-The container joins the existing `docker_influxdb-network` and reaches InfluxDB
-by container name. `.env` supplies `influxdb_token` and is never baked into the
-image.
+The container joins the existing `docker_influxdb-network`. `.env` supplies
+`influxdb_token` and `INFLUX_URL` (see `.env.example`) and is never baked into
+the image; `docker compose` refuses to start without `INFLUX_URL`.
 
 Local development without Docker:
 
@@ -80,8 +80,8 @@ checks, with a bypass for the repo admin so direct pushes still work.
 
 ## Reverse proxy
 
-Caddy runs on a separate tailnet node (`caddy`, <caddy-tailscale-ip>), so it
-reaches this machine over the tailnet:
+Caddy runs on a separate tailnet node, so it reaches this machine over the
+tailnet. Substitute your own hostname and this machine's Tailscale IP:
 
 ```
 dashboard.example.com {
@@ -142,9 +142,9 @@ querying the live database. `server/queries.js` depends on all of them.
 The dashboard has no authentication of its own; Tailscale plus Caddy is the
 boundary. Two things to be aware of:
 
-- Publishing `8090` on `0.0.0.0` also exposes it to this machine's LAN, matching
-  how InfluxDB, Frigate and MQTT already run here. For tailnet-only, change the
-  port mapping in `docker-compose.yml` to `<dashboard-tailscale-ip>:8090:8090`.
+- Publishing `8090` on `0.0.0.0` also exposes it to this machine's LAN. For
+  tailnet-only, change the port mapping in `docker-compose.yml` to
+  `<dashboard-tailscale-ip>:8090:8090`.
 - The admin token is currently used for reads. A read-only token scoped to the
   `ruuvi` and `matter` databases would be a drop-in replacement for
   `influxdb_token` in `.env`.

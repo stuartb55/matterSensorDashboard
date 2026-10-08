@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Mobile-first temperature/humidity dashboard for a house, reading from InfluxDB 3
-and served over Tailscale at `https://dashboard.example.com`. Fastify API +
-React/uPlot SPA in one repo, one `package.json`, one origin. See `README.md` for
+and served over Tailscale behind Caddy. Fastify API + React/uPlot SPA in one
+repo, one `package.json`, one origin. See `README.md` for
 the deployment topology (Caddy on a separate tailnet node) and the sensor
 inventory.
 
@@ -42,7 +42,9 @@ passed. It is built for `linux/amd64` and `linux/arm64` — the deployment host
 is Apple silicon, and dropping either one makes `docker compose pull` fail with
 "no matching manifest" on that architecture.
 
-`.env` supplies `influxdb_token` and is gitignored and dockerignored.
+`.env` supplies `influxdb_token` and `INFLUX_URL` and is gitignored and
+dockerignored; `.env.example` shows the shape. Keep hostnames, tailnet IPs and
+LAN addresses out of committed files — the repository is public.
 `server/influx.js` accepts either `INFLUX_TOKEN` or `influxdb_token` and throws
 at startup if neither is set.
 
@@ -119,8 +121,9 @@ the live database.
 
 ## Deployment notes
 
-- The container reaches InfluxDB by container name on `docker_influxdb-network`;
-  `localhost:8181` would resolve to the dashboard container itself.
+- The container reaches InfluxDB at `INFLUX_URL` from `.env` (compose refuses to
+  start without it); `localhost:8181` would resolve to the dashboard container
+  itself.
 - `docker-compose.yml` carries both `image:` (the GHCR package, `pull_policy:
   always`) and `build:`. Plain `up -d` deploys what CI published; `--build`
   builds the checkout and tags it with the same name. GHCR image names must be
