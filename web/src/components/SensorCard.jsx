@@ -5,6 +5,7 @@ import {
   bridgeGaps,
   fmtAge,
   fmtBattery,
+  fmtCo2,
   fmtHum,
   fmtTemp,
   batteryLow,
@@ -12,11 +13,11 @@ import {
 } from '../format.js';
 
 /**
- * Stat tile for one sensor: label, current value, humidity, trend and a
- * sparkline over the selected range.
+ * Stat tile for one sensor: label, current value, humidity (and CO2 where the
+ * sensor has one), trend and a sparkline over the selected range.
  */
 export default function SensorCard({ reading, history, bucketSec, rangeLabel, onOpen }) {
-  const { id, label, tempC, humidity, battery, batteryKind, stale, ageSec } = reading;
+  const { id, label, tempC, humidity, co2, hasCo2, battery, batteryKind, stale, ageSec } = reading;
   // Trend uses the raw series — never the bridged copy.
   const delta = history ? trend(history.temp) : null;
   const lowBattery = batteryLow(battery, batteryKind);
@@ -40,7 +41,9 @@ export default function SensorCard({ reading, history, bucketSec, rangeLabel, on
       type="button"
       className={`card${stale ? ' is-stale' : ''}`}
       onClick={() => onOpen(id)}
-      aria-label={`${label}, ${fmtTemp(tempC)} degrees, ${fmtHum(humidity)} percent humidity. Open detail.`}
+      aria-label={`${label}, ${fmtTemp(tempC)} degrees, ${fmtHum(humidity)} percent humidity${
+        hasCo2 ? `, ${fmtCo2(co2)} parts per million CO2` : ''
+      }. Open detail.`}
     >
       <div className="card-top">
         <p className="card-label">{label}</p>
@@ -65,6 +68,7 @@ export default function SensorCard({ reading, history, bucketSec, rangeLabel, on
 
       <div className="card-sub">
         <span>{fmtHum(humidity)}% humidity</span>
+        {hasCo2 && <span>{fmtCo2(co2)} ppm CO₂</span>}
         {deltaText && <span className="delta">{deltaText}</span>}
       </div>
 

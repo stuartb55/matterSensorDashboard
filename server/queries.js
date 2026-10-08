@@ -63,6 +63,31 @@ async function latestRuuvi(sensors) {
 }
 
 /**
+ * CO2 is read separately from the main Ruuvi query for two reasons: the Ruuvi
+ * Air broadcasts more than one data format, so its newest row may not carry
+ * CO2 at all, and a failure here (column missing, say) must not take every
+ * Ruuvi card offline with it. It degrades to no CO2 value instead.
+ */
+async function latestCo2(sensors) {
+  if (!sensors.length) return [];
+  const src = SOURCES.ruuvi;
+  const sql = `
+    SELECT DISTINCT ON (${src.tag})
+      ${src.tag} AS key, ${src.co2} AS co2
+    FROM ${src.table}
+    WHERE time > now() - INTERVAL '${LATEST_LOOKBACK}'
+      AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
+      AND ${src.co2} IS NOT NULL
+    ORDER BY ${src.tag}, time DESC`;
+  try {
+    return await query(src.db, sql);
+  } catch (err) {
+    console.warn(`CO2 query failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * The Matter writer emits temperature and humidity as separate rows a couple of
  * milliseconds apart, so "the most recent row per node" has one field populated
  * and the other null. Rank each field independently instead, pushing nulls to
@@ -119,10 +144,11 @@ async function latestDoorStates(sensors) {
  */
 export async function fetchLatest() {
   const doors = SENSORS.filter((sensor) => sensor.kind === 'door');
-  const [ruuviRows, matterRows, doorStateRows] = await Promise.all([
+  const [ruuviRows, matterRows, doorStateRows, co2Rows] = await Promise.all([
     latestRuuvi(sensorsForSource('ruuvi')),
     latestMatter(sensorsForSource('matter').filter((sensor) => sensor.kind !== 'door')),
     latestDoorStates(doors),
+    latestCo2(sensorsForSource('ruuvi').filter((sensor) => sensor.hasCo2)),
   ]);
 
   const readings = new Map();
@@ -138,6 +164,12 @@ export async function fetchLatest() {
   for (const row of doorStateRows) {
     const sensor = lookup('matter', row.key);
     if (sensor?.kind === 'door') doorStates.set(sensor.id, row);
+  }
+
+  const co2 = new Map();
+  for (const row of co2Rows) {
+    const sensor = lookup('ruuvi', row.key);
+    if (sensor?.hasCo2) co2.set(sensor.id, row.co2);
   }
 
   const now = Date.now();
@@ -158,6 +190,8 @@ export async function fetchLatest() {
       kind: sensor.kind,
       tempC: row?.temp ?? null,
       humidity: row?.hum ?? null,
+      co2: co2.get(sensor.id) ?? null,
+      hasCo2: Boolean(sensor.hasCo2),
       battery: sensor.noBattery ? null : row?.batt ?? null,
       batteryKind: SOURCES[sensor.source].battKind,
       rssi: row?.rssi ?? null,

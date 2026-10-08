@@ -1,5 +1,6 @@
 export const fmtTemp = (v) => (v == null ? '—' : v.toFixed(1));
 export const fmtHum = (v) => (v == null ? '—' : Math.round(v).toString());
+export const fmtCo2 = (v) => (v == null ? '—' : Math.round(v).toString());
 
 export function fmtAge(sec) {
   if (sec == null) return 'no data';
