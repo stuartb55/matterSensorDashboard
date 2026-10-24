@@ -3,6 +3,7 @@ import { getHistory, getLatest, RANGES } from './api.js';
 import { fmtAge } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
+import PowerCard from './components/PowerCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 
@@ -114,6 +115,7 @@ export default function App() {
   const rooms = readings?.filter((r) => r.kind === 'room') ?? [];
   const equipment = readings?.filter((r) => r.kind === 'equipment') ?? [];
   const doors = readings?.filter((r) => r.kind === 'door') ?? [];
+  const meters = readings?.filter((r) => r.kind === 'power') ?? [];
   const selectedReading = readings?.find((r) => r.id === selected) ?? null;
 
   const freshest = readings?.reduce(
@@ -123,6 +125,7 @@ export default function App() {
   const offline = readings?.filter((r) => r.stale).length ?? 0;
   const roomsOffline = rooms.filter((r) => r.stale).length;
   const equipmentOffline = equipment.filter((r) => r.stale).length;
+  const metersOffline = meters.filter((r) => r.stale).length;
 
   return (
     <div className="app">
@@ -206,6 +209,27 @@ export default function App() {
               <div className="grid">
                 {equipment.map((r) => (
                   <SensorCard
+                    key={r.id}
+                    reading={r}
+                    history={seriesById.get(r.id)}
+                    bucketSec={history?.bucketSec}
+                    rangeLabel={rangeLabel}
+                    onOpen={setSelected}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {meters.length > 0 && (
+            <>
+              <div className="section-head">
+                <h2>Energy</h2>
+                <OfflineNote count={metersOffline} />
+              </div>
+              <div className="grid">
+                {meters.map((r) => (
+                  <PowerCard
                     key={r.id}
                     reading={r}
                     history={seriesById.get(r.id)}

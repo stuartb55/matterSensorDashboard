@@ -116,3 +116,52 @@ export function trend(values) {
   if (first == null || last == null) return null;
   return last - first;
 }
+
+/** Watts below a kilowatt, kilowatts above, so a kettle reads "2.85 kW". */
+export function fmtPower(w) {
+  if (w == null) return { value: '—', unit: 'W' };
+  if (Math.abs(w) >= 1000) return { value: (w / 1000).toFixed(2), unit: 'kW' };
+  return { value: Math.abs(w) < 10 ? w.toFixed(1) : Math.round(w).toString(), unit: 'W' };
+}
+
+export const fmtEnergy = (kwh) =>
+  kwh == null ? '—' : kwh < 10 ? kwh.toFixed(2) : kwh.toFixed(1);
+export const fmtVolts = (v) => (v == null ? '—' : Math.round(v).toString());
+export const fmtAmps = (a) => (a == null ? '—' : a.toFixed(2));
+
+/**
+ * Energy used across the window, in kWh.
+ *
+ * Read from the meter's cumulative counter where there is one: the sum of its
+ * rises between buckets, starting from the lowest value in the first bucket.
+ * A drop means the counter was reset, so it counts as zero rather than as
+ * negative use. Without a counter, average power is integrated over each
+ * bucket instead, which undercounts across gaps, so it is flagged `estimated`.
+ */
+export function energyUsed(series, bucketSec) {
+  if (!series) return null;
+  const { kwhLo, kwhHi, watts } = series;
+
+  let prev = null;
+  let total = 0;
+  let seen = false;
+  for (let i = 0; i < kwhHi.length; i += 1) {
+    const hi = kwhHi[i];
+    if (hi == null) continue;
+    if (prev == null) prev = kwhLo[i] ?? hi;
+    if (hi > prev) total += hi - prev;
+    prev = hi;
+    seen = true;
+  }
+  if (seen) return { kwh: total, estimated: false };
+
+  if (!bucketSec) return null;
+  let wh = 0;
+  let n = 0;
+  for (const w of watts) {
+    if (w == null) continue;
+    wh += (w * bucketSec) / 3600;
+    n += 1;
+  }
+  return n ? { kwh: wh / 1000, estimated: true } : null;
+}

@@ -28,6 +28,20 @@ export const SOURCES = {
     hum: 'humidity_pct',
     batt: 'battery_pct',
     contact: 'contact_closed',
+    // Electrical measurements from a power meter (Shelly PM1 Gen4). Like
+    // temperature and humidity, each field can arrive on its own row, so every
+    // one is ranked independently. `scale` converts the stored value to the
+    // unit shown: W, V, A and kWh. Columns missing from the table are skipped
+    // rather than failing the query, so a wrong name here costs one reading,
+    // not the whole dashboard.
+    power: {
+      watts: { col: 'power_w', scale: 1 },
+      volts: { col: 'voltage_v', scale: 1 },
+      amps: { col: 'current_a', scale: 1 },
+      // Cumulative counter. Consumption over a range is the rise in this
+      // value; when it is absent the frontend integrates power instead.
+      kwh: { col: 'energy_kwh', scale: 1 },
+    },
     battKind: 'pct',
     // IKEA sensors average a reading every ~6 min, but measured gaps reach 29
     // min in normal operation. Threshold sits well above that so ordinary
@@ -66,6 +80,16 @@ export const SENSORS = [
     kind: 'door',
     source: 'matter',
     key: 'BackDoor',
+    noBattery: true,
+  },
+  // Shelly PM1 Gen4 power meter over Matter. Mains-powered and on its own
+  // scale (watts), so it gets its own section and never joins a climate plot.
+  {
+    id: 'shelly_pm1',
+    label: 'Power',
+    kind: 'power',
+    source: 'matter',
+    key: 'ShellyPM1',
     noBattery: true,
   },
 ];

@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/stuartb55/matterSensorDashboard/actions/workflows/ci.yml)
 
-Mobile-first temperature and humidity dashboard for the house, reading from InfluxDB 3
+Mobile-first temperature, humidity and power dashboard for the house, reading from InfluxDB 3
 
 ## Sensors
 
-Eleven sensors across two databases, unified by the registry in
+Twelve sensors across two databases, unified by the registry in
 `server/sensors.js`:
 
 | Device | Source | Database |
@@ -15,12 +15,22 @@ Eleven sensors across two databases, unified by the registry in
 | Bathroom, Kitchen, Hallway, Closet | IKEA TIMMERFLOTTE over Matter (~6 min) | `matter.matter` |
 | Hot Water | RuuviTag on the tank | `ruuvi.ruuvi_measurements` |
 | Garage, Back Door | IKEA MYGGBETT contact sensor over Matter | `matter.matter` |
+| Power | Shelly PM1 Gen4 power meter over Matter | `matter.matter` |
 
 Hot Water is marked `kind: "equipment"`: it sits near 47 °C while rooms sit near
 25 °C, so it gets its own card section and is kept off the shared room scale.
 Door contacts are marked `kind: "door"` and show their last known open/closed
 state and when it last changed. Because they only report when the state changes,
 an unchanged door is not treated as offline.
+
+The Shelly PM1 is marked `kind: "power"` and gets its own Energy section: the
+current draw, the energy used over the selected range, voltage and current, and
+a detail sheet with power and voltage charts. Its column names live in
+`SOURCES.matter.power` (defaults `power_w`, `voltage_v`, `current_a` and the
+cumulative `energy_kwh`), each with a `scale` to W/V/A/kWh. Configured columns
+missing from the table are skipped (looked up through `information_schema`), so
+a wrong name blanks one figure rather than the dashboard. Without an energy
+counter, energy used is estimated from average power and marked with "≈".
 
 The Garage sensor is Matter node `Garage` (node ID `6`, endpoint `1`). Its
 `contact_closed` field is a float: `1.0` means the garage door is shut and
