@@ -6,13 +6,12 @@ import {
   bridgeGaps,
   energyUsed,
   fmtAge,
-  fmtAmps,
+  fmtElectrical,
   fmtEnergy,
   fmtHum,
   fmtPower,
   fmtTemp,
   fmtBattery,
-  fmtVolts,
   summarise,
 } from '../format.js';
 
@@ -100,7 +99,7 @@ function PowerHistory({ reading, series, drawn, t, bucketSec, range, rangeLabel,
         <h3 className="panel-title">Power</h3>
         <p className="panel-sub">
           Average draw over {rangeLabel}. The shaded band reaches the highest and
-          lowest reading in each bucket, so short loads like a kettle still show.
+          lowest reading in each bucket, so short spikes still show.
         </p>
         <TimeChart
           t={t}
@@ -230,9 +229,7 @@ export default function DetailSheet({
                 <span className="hero">
                   {power.value} {power.unit}
                 </span>
-                <span>
-                  {fmtVolts(reading.volts)} V · {fmtAmps(reading.amps)} A
-                </span>
+                <span>{fmtElectrical(reading.volts, reading.amps)}</span>
               </div>
             ) : (
               <div className="sheet-now">
@@ -283,8 +280,9 @@ export default function DetailSheet({
                       ? [
                           { label: 'Power W', values: series.watts, digits: 0 },
                           { label: 'Peak W', values: series.wattsHi, digits: 0 },
+                          { label: 'Current A', values: series.amps, digits: 2 },
                           { label: 'Voltage V', values: series.volts },
-                        ]
+                        ].filter((c) => c.values.some((v) => v != null))
                       : [
                           { label: 'Temp °C', values: series.temp },
                           { label: 'Humidity %', values: series.hum, digits: 0 },

@@ -28,19 +28,20 @@ export const SOURCES = {
     hum: 'humidity_pct',
     batt: 'battery_pct',
     contact: 'contact_closed',
-    // Electrical measurements from a power meter (Shelly PM1 Gen4). Like
-    // temperature and humidity, each field can arrive on its own row, so every
-    // one is ranked independently. `scale` converts the stored value to the
+    // Electrical measurements from a power meter (Shelly 1PM Gen4). Every
+    // value arrives on its own row (power and current only when they change,
+    // energy once a minute), so each one is ranked independently. `scale` converts the stored value to the
     // unit shown: W, V, A and kWh. Columns missing from the table are skipped
     // rather than failing the query, so a wrong name here costs one reading,
     // not the whole dashboard.
     power: {
       watts: { col: 'power_w', scale: 1 },
+      // The column exists, but the Shelly 1PM Gen4 leaves it empty.
       volts: { col: 'voltage_v', scale: 1 },
       amps: { col: 'current_a', scale: 1 },
-      // Cumulative counter. Consumption over a range is the rise in this
+      // Lifetime counter in Wh. Consumption over a range is the rise in this
       // value; when it is absent the frontend integrates power instead.
-      kwh: { col: 'energy_kwh', scale: 1 },
+      kwh: { col: 'energy_wh', scale: 0.001 },
     },
     battKind: 'pct',
     // IKEA sensors average a reading every ~6 min, but measured gaps reach 29
@@ -82,14 +83,15 @@ export const SENSORS = [
     key: 'BackDoor',
     noBattery: true,
   },
-  // Shelly PM1 Gen4 power meter over Matter. Mains-powered and on its own
-  // scale (watts), so it gets its own section and never joins a climate plot.
+  // Shelly 1PM Gen4 power meter over Matter (node_id 7), on the network kit.
+  // Mains-powered and on its own scale (watts), so it gets its own section and
+  // never joins a climate plot.
   {
-    id: 'shelly_pm1',
-    label: 'Power',
+    id: 'network_power',
+    label: 'Network',
     kind: 'power',
     source: 'matter',
-    key: 'ShellyPM1',
+    key: 'Network',
     noBattery: true,
   },
 ];

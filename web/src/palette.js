@@ -16,7 +16,7 @@ const SLOT_BY_ID = {
   hallway: 7,
   closet: 8,
   hot_water: 1,
-  shelly_pm1: 1,
+  network_power: 1,
 };
 
 /** Resolve a sensor's series colour to a concrete hex for canvas drawing. */

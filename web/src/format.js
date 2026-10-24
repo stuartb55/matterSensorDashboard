@@ -129,6 +129,12 @@ export const fmtEnergy = (kwh) =>
 export const fmtVolts = (v) => (v == null ? '—' : Math.round(v).toString());
 export const fmtAmps = (a) => (a == null ? '—' : a.toFixed(2));
 
+/** "235 V · 0.62 A", leaving out whichever the meter doesn't report. */
+export const fmtElectrical = (volts, amps) =>
+  [volts != null && `${fmtVolts(volts)} V`, amps != null && `${fmtAmps(amps)} A`]
+    .filter(Boolean)
+    .join(' · ');
+
 /**
  * Energy used across the window, in kWh.
  *

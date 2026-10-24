@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Sparkline from './Sparkline.jsx';
 import { seriesVar } from '../palette.js';
-import { bridgeGaps, energyUsed, fmtAge, fmtAmps, fmtEnergy, fmtPower, fmtVolts } from '../format.js';
+import { bridgeGaps, energyUsed, fmtAge, fmtElectrical, fmtEnergy, fmtPower } from '../format.js';
 
 /**
  * Stat tile for a power meter: what is being drawn right now, how much energy
@@ -49,9 +49,7 @@ export default function PowerCard({ reading, history, bucketSec, rangeLabel, onO
       <div className="card-sub">
         {usedText && <span>{usedText}</span>}
         {(volts != null || amps != null) && (
-          <span className="delta">
-            {fmtVolts(volts)} V · {fmtAmps(amps)} A
-          </span>
+          <span className="delta">{fmtElectrical(volts, amps)}</span>
         )}
       </div>
 
