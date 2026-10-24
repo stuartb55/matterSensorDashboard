@@ -4,6 +4,31 @@ import 'uplot/dist/uPlot.min.css';
 import { readTheme, withAlpha } from '../palette.js';
 import { axisValues, fmtTick, fmtTime } from '../format.js';
 
+// uPlot's own default for y, kept for every series that actually varies.
+const Y_RANGE = { min: { pad: 0.1, soft: 0, mode: 3 }, max: { pad: 0.1, soft: 0, mode: 3 } };
+
+/**
+ * A flat series would otherwise be ranged out to zero (a steady 246 V drawn
+ * on a 0-400 axis), so give it a small window around its value instead.
+ */
+function yRange(_u, min, max) {
+  if (min == null || max == null) return [0, 1];
+  if (min === max) {
+    const pad = Math.max(Math.abs(min) * 0.01, 0.5);
+    return [min - pad, max + pad];
+  }
+  return uPlot.rangeNum(min, max, Y_RANGE);
+}
+
+/** Indices of values with no non-null neighbour on either side. */
+function isolatedIndices(values) {
+  const out = [];
+  for (let i = 0; i < values.length; i += 1) {
+    if (values[i] != null && values[i - 1] == null && values[i + 1] == null) out.push(i);
+  }
+  return out;
+}
+
 /**
  * Line chart over a shared time axis.
  *
@@ -58,7 +83,15 @@ export default function TimeChart({
         label: s.label,
         stroke: s.color,
         width: 2, // 2px line, round join/cap
-        points: { show: false },
+        // A reading with no neighbour on either side has no line to sit on,
+        // so it is drawn as a dot; otherwise a sparse series (a meter that
+        // only reports on change) renders as an empty plot.
+        points: {
+          show: true,
+          size: 6,
+          fill: s.color,
+          filter: (_u, _idx, show) => (show ? isolatedIndices(s.values) : null),
+        },
         spanGaps: false,
       })),
     ];
@@ -91,7 +124,7 @@ export default function TimeChart({
           points: { show: false },
           drag: { x: false, y: false, setScale: false },
         },
-        scales: { x: { time: true } },
+        scales: { x: { time: true }, y: { range: yRange } },
         axes: [
           { ...axisBase, values: (_u, splits) => splits.map((v) => fmtTick(v, range)) },
           { ...axisBase, size: 44, values: (_u, splits) => axisValues(splits) },
