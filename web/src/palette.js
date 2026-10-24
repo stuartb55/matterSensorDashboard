@@ -4,7 +4,8 @@
 // The eight categorical slots are assigned in the fixed validated order. There
 // are exactly eight rooms, so no slot is ever cycled or generated. Hot Water is
 // equipment on its own scale and never shares a plot with the rooms, so it
-// takes slot 1 without any risk of collision.
+// takes slot 1 without any risk of collision. The power meter is the same: its
+// own watt scale, never on a plot with anything else.
 const SLOT_BY_ID = {
   living_room: 1,
   bedroom: 2,
@@ -15,6 +16,7 @@ const SLOT_BY_ID = {
   hallway: 7,
   closet: 8,
   hot_water: 1,
+  network_power: 1,
 };
 
 /** Resolve a sensor's series colour to a concrete hex for canvas drawing. */

@@ -87,6 +87,12 @@ async function latestCo2(sensors) {
   }
 }
 
+/** Rank rows per node by recency of a non-null value, nulls pushed last. */
+function rankByField(src, col, alias) {
+  return `row_number() OVER (PARTITION BY ${src.tag} ` +
+    `ORDER BY CASE WHEN ${col} IS NULL THEN 1 ELSE 0 END, time DESC) AS ${alias}`;
+}
+
 /**
  * The Matter writer emits temperature and humidity as separate rows a couple of
  * milliseconds apart, so "the most recent row per node" has one field populated
@@ -96,9 +102,7 @@ async function latestCo2(sensors) {
 async function latestMatter(sensors) {
   if (!sensors.length) return [];
   const src = SOURCES.matter;
-  const rank = (col, alias) =>
-    `row_number() OVER (PARTITION BY ${src.tag} ` +
-    `ORDER BY CASE WHEN ${col} IS NULL THEN 1 ELSE 0 END, time DESC) AS ${alias}`;
+  const rank = (col, alias) => rankByField(src, col, alias);
 
   const sql = `
     SELECT ${src.tag} AS key,
@@ -117,6 +121,85 @@ async function latestMatter(sensors) {
     )
     GROUP BY ${src.tag}`;
   return query(src.db, sql);
+}
+
+// ---------------------------------------------------------------------------
+// Power meter
+// ---------------------------------------------------------------------------
+
+// Column lists change only when a new device starts writing, so they are
+// looked up rarely.
+const COLUMNS_TTL_MS = 10 * 60_000;
+const columnCache = new Map();
+
+/**
+ * Columns that exist in a table, or null when the lookup itself fails (in which
+ * case every configured column is tried and the query's own error decides).
+ */
+async function tableColumns(db, table) {
+  const cacheKey = `${db}.${table}`;
+  const hit = columnCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < COLUMNS_TTL_MS) return hit.cols;
+  try {
+    const rows = await query(
+      db,
+      `SELECT column_name FROM information_schema.columns WHERE table_name = ${sqlList([table])}`,
+    );
+    const cols = new Set(rows.map((r) => r.column_name));
+    columnCache.set(cacheKey, { at: Date.now(), cols });
+    return cols;
+  } catch (err) {
+    console.warn(`column lookup failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Configured power fields that are actually present, as [name, { col, scale }].
+ * A misnamed column drops that one measurement instead of the whole query.
+ */
+async function powerFields() {
+  const src = SOURCES.matter;
+  const cols = await tableColumns(src.db, src.table);
+  return Object.entries(src.power).filter(([, f]) => !cols || cols.has(f.col));
+}
+
+const scaled = (value, field) => (value == null ? null : value * field.scale);
+
+/**
+ * Latest value of each electrical measurement. Ranked per field for the same
+ * reason as latestMatter: a meter may write each measurement on its own row.
+ * Like CO2, a failure here degrades to no power reading rather than taking the
+ * climate cards down with it.
+ */
+async function latestPower(sensors) {
+  if (!sensors.length) return [];
+  const src = SOURCES.matter;
+  try {
+    const fields = await powerFields();
+    if (!fields.length) return [];
+    const sql = `
+      SELECT ${src.tag} AS key,
+        ${fields.map(([name, f]) => `max(${f.col}) FILTER (WHERE r_${name} = 1) AS ${name}`).join(',\n        ')},
+        max(time) AS time
+      FROM (
+        SELECT ${src.tag}, ${fields.map(([, f]) => f.col).join(', ')}, time,
+          ${fields.map(([name, f]) => rankByField(src, f.col, `r_${name}`)).join(',\n          ')}
+        FROM ${src.table}
+        WHERE time > now() - INTERVAL '${LATEST_LOOKBACK}'
+          AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
+      )
+      GROUP BY ${src.tag}`;
+    const rows = await query(src.db, sql);
+    return rows.map((row) => {
+      const out = { key: row.key, time: row.time };
+      for (const [name, f] of fields) out[name] = scaled(row[name], f);
+      return out;
+    });
+  } catch (err) {
+    console.warn(`power query failed: ${err.message}`);
+    return [];
+  }
 }
 
 /**
@@ -142,17 +225,22 @@ async function latestDoorStates(sensors) {
  * Sensors with no recent data are still returned, with null values, so the UI
  * can show them as offline.
  */
+/** Temperature/humidity devices, as opposed to door contacts and meters. */
+const isClimate = (sensor) => sensor.kind === 'room' || sensor.kind === 'equipment';
+
 export async function fetchLatest() {
   const doors = SENSORS.filter((sensor) => sensor.kind === 'door');
-  const [ruuviRows, matterRows, doorStateRows, co2Rows] = await Promise.all([
+  const meters = SENSORS.filter((sensor) => sensor.kind === 'power');
+  const [ruuviRows, matterRows, doorStateRows, co2Rows, powerRows] = await Promise.all([
     latestRuuvi(sensorsForSource('ruuvi')),
-    latestMatter(sensorsForSource('matter').filter((sensor) => sensor.kind !== 'door')),
+    latestMatter(sensorsForSource('matter').filter((sensor) => isClimate(sensor))),
     latestDoorStates(doors),
     latestCo2(sensorsForSource('ruuvi').filter((sensor) => sensor.hasCo2)),
+    latestPower(meters),
   ]);
 
   const readings = new Map();
-  for (const [source, rows] of [['ruuvi', ruuviRows], ['matter', matterRows]]) {
+  for (const [source, rows] of [['ruuvi', ruuviRows], ['matter', matterRows], ['matter', powerRows]]) {
     for (const row of rows) {
       const sensor = lookup(source, row.key);
       if (!sensor) continue; // device not in the registry
@@ -195,6 +283,11 @@ export async function fetchLatest() {
       battery: sensor.noBattery ? null : row?.batt ?? null,
       batteryKind: SOURCES[sensor.source].battKind,
       rssi: row?.rssi ?? null,
+      // Power meter only: watts, volts, amps and the cumulative kWh counter.
+      watts: row?.watts ?? null,
+      volts: row?.volts ?? null,
+      amps: row?.amps ?? null,
+      kwh: row?.kwh ?? null,
       closed: sensor.kind === 'door' && state?.closed != null ? state.closed !== 0 : null,
       stateTs,
       ts,
@@ -228,6 +321,50 @@ async function historyForSource(source, sensors, range) {
 }
 
 /**
+ * Bucketed electrical history. Power keeps its min and max per bucket so a
+ * kettle's short spike survives the averaging; the energy counter keeps both
+ * ends of each bucket so consumption can be read off as its rise.
+ */
+const POWER_AGGREGATES = [
+  ['watts', 'avg', 'watts'],
+  ['wattsLo', 'min', 'watts'],
+  ['wattsHi', 'max', 'watts'],
+  ['volts', 'avg', 'volts'],
+  ['amps', 'avg', 'amps'],
+  ['kwhLo', 'min', 'kwh'],
+  ['kwhHi', 'max', 'kwh'],
+];
+
+async function historyForPower(sensors, range) {
+  if (!sensors.length) return [];
+  const src = SOURCES.matter;
+  const { interval, bucket } = RANGES[range];
+  try {
+    const present = new Map(await powerFields());
+    const aggs = POWER_AGGREGATES.filter(([, , field]) => present.has(field));
+    if (!aggs.length) return [];
+    const sql = `
+      SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
+        ${src.tag} AS key,
+        ${aggs.map(([alias, fn, field]) => `${fn}(${present.get(field).col}) AS "${alias}"`).join(',\n        ')}
+      FROM ${src.table}
+      WHERE time > now() - INTERVAL '${interval}'
+        AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
+      GROUP BY bucket, ${src.tag}
+      ORDER BY bucket`;
+    const rows = await query(src.db, sql);
+    return rows.map((row) => {
+      const out = { bucket: row.bucket, key: row.key };
+      for (const [alias, , field] of aggs) out[alias] = scaled(row[alias], present.get(field));
+      return out;
+    });
+  } catch (err) {
+    console.warn(`power history query failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Bucketed history on a shared, evenly spaced time axis.
  *
  * Every series is padded to the full axis with nulls, which is what lets the
@@ -244,9 +381,11 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
     .filter((s) => s.kind !== 'door');
   if (!wanted.length) return { range, bucketSec, t: [], series: [] };
 
-  const [ruuviRows, matterRows] = await Promise.all([
-    historyForSource('ruuvi', wanted.filter((s) => s.source === 'ruuvi'), range),
-    historyForSource('matter', wanted.filter((s) => s.source === 'matter'), range),
+  const climate = wanted.filter(isClimate);
+  const [ruuviRows, matterRows, powerRows] = await Promise.all([
+    historyForSource('ruuvi', climate.filter((s) => s.source === 'ruuvi'), range),
+    historyForSource('matter', climate.filter((s) => s.source === 'matter'), range),
+    historyForPower(wanted.filter((s) => s.kind === 'power'), range),
   ]);
 
   // date_bin anchors buckets to the epoch, so the axis is built the same way.
@@ -261,6 +400,7 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
     return i >= 0 && i < count ? i : -1;
   };
 
+  const empty = () => new Array(count).fill(null);
   const series = new Map(
     wanted.map((s) => [
       s.id,
@@ -272,11 +412,11 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
         // client bridges null runs up to this long so a sensor reporting more
         // slowly than the bucket width doesn't render as a dashed line, while
         // a genuine outage still shows as a break.
-        bridgeSec: SOURCES[s.source].staleAfterSec,
-        temp: new Array(count).fill(null),
-        tempLo: new Array(count).fill(null),
-        tempHi: new Array(count).fill(null),
-        hum: new Array(count).fill(null),
+        bridgeSec: s.staleAfterSec ?? SOURCES[s.source].staleAfterSec,
+        // Meters carry electrical series; everything else is climate.
+        ...(s.kind === 'power'
+          ? Object.fromEntries(POWER_AGGREGATES.map(([alias]) => [alias, empty()]))
+          : { temp: empty(), tempLo: empty(), tempHi: empty(), hum: empty() }),
       },
     ]),
   );
@@ -296,6 +436,17 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
       target.tempHi[i] = row.temp_hi ?? null;
       target.hum[i] = row.hum ?? null;
     }
+  }
+
+  for (const row of powerRows) {
+    const sensor = lookup('matter', row.key);
+    const target = sensor && series.get(sensor.id);
+    if (!target) continue;
+    const ms = parseInfluxTime(row.bucket);
+    if (ms == null) continue;
+    const i = indexOf(Math.floor(ms / 1000));
+    if (i === -1) continue;
+    for (const [alias] of POWER_AGGREGATES) target[alias][i] = row[alias] ?? null;
   }
 
   return { range, bucketSec, t, series: [...series.values()] };

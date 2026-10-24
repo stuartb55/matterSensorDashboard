@@ -51,7 +51,7 @@ at startup if neither is set.
 ## Architecture
 
 **The sensor registry is the spine.** `server/sensors.js` holds `SOURCES` (the
-two upstream schemas) and `SENSORS` (eleven devices). Everything else — SQL
+two upstream schemas) and `SENSORS` (twelve devices). Everything else — SQL
 generation, response shaping, staleness, battery units, the public `/api/sensors`
 payload — derives from it. Adding a sensor from an existing source is a one-line
 change there and nothing else. `publicRegistry()` is the boundary that keeps
@@ -100,6 +100,11 @@ the live database.
   (measured Matter gaps reach 29 min in normal operation).
 - **Matter history is much shorter than Ruuvi's**, so on 7d/30d those series
   legitimately start partway along the axis.
+- **Power columns are optional.** `latestPower()` and `historyForPower()` only
+  select the `SOURCES.matter.power` columns that `information_schema` says
+  exist, and degrade to nulls on failure, like CO2. Energy used over a range is
+  the rise in the cumulative counter (resets count as zero), falling back to
+  integrated average power, flagged as an estimate.
 - **Hot Water is `kind: "equipment"`** — it sits near 47 °C and must stay off any
   shared room scale, or every room curve flattens.
 

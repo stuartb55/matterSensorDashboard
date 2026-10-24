@@ -2,11 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import TimeChart from './TimeChart.jsx';
 import TableView from './TableView.jsx';
 import { seriesColor } from '../palette.js';
-import { bridgeGaps, fmtAge, fmtHum, fmtTemp, fmtBattery, summarise } from '../format.js';
+import {
+  bridgeGaps,
+  energyUsed,
+  fmtAge,
+  fmtElectrical,
+  fmtEnergy,
+  fmtHum,
+  fmtPower,
+  fmtTemp,
+  fmtBattery,
+  summarise,
+} from '../format.js';
 
-function Stats({ values, unit, digits = 1 }) {
+/**
+ * `lo` and `hi` optionally supply per-bucket extremes, so Min and Max report
+ * the real lowest and highest readings rather than the extremes of averages.
+ */
+function Stats({ values, unit, digits = 1, lo = null, hi = null }) {
   const s = summarise(values);
   if (!s) return null;
+  s.min = (lo && summarise(lo)?.min) ?? s.min;
+  s.max = (hi && summarise(hi)?.max) ?? s.max;
   return (
     <dl className="stats">
       <div className="stat">
@@ -34,6 +51,111 @@ function Stats({ values, unit, digits = 1 }) {
   );
 }
 
+function ClimateHistory({ reading, series, drawn, t, range, rangeLabel, color }) {
+  return (
+    <>
+      <section className="panel">
+        <h3 className="panel-title">Temperature</h3>
+        <p className="panel-sub">
+          Bucket average over {rangeLabel}. The shaded band spans the lowest and
+          highest reading within each bucket, so it stays narrow while the sensor
+          holds steady.
+        </p>
+        <TimeChart
+          t={t}
+          range={range}
+          unit="°C"
+          height={210}
+          ariaLabel={`Temperature for ${reading.label} over ${rangeLabel}`}
+          series={[{ label: 'Temperature', values: drawn.temp, color }]}
+          band={{ lo: drawn.lo, hi: drawn.hi }}
+        />
+        <Stats values={series.temp} unit="°C" />
+      </section>
+
+      <section className="panel">
+        <h3 className="panel-title">Humidity</h3>
+        <p className="panel-sub">Relative humidity over {rangeLabel}.</p>
+        <TimeChart
+          t={t}
+          range={range}
+          unit="%"
+          height={180}
+          ariaLabel={`Humidity for ${reading.label} over ${rangeLabel}`}
+          series={[{ label: 'Humidity', values: drawn.hum, color }]}
+        />
+        <Stats values={series.hum} unit="%" digits={0} />
+      </section>
+    </>
+  );
+}
+
+function PowerHistory({ reading, series, drawn, t, bucketSec, range, rangeLabel, color }) {
+  const used = energyUsed(series, bucketSec);
+  const hasVolts = series.volts.some((v) => v != null);
+  return (
+    <>
+      <section className="panel">
+        <h3 className="panel-title">Power</h3>
+        <p className="panel-sub">
+          Average draw over {rangeLabel}. The shaded band reaches the highest and
+          lowest reading in each bucket, so short spikes still show.
+        </p>
+        <TimeChart
+          t={t}
+          range={range}
+          unit=" W"
+          height={210}
+          ariaLabel={`Power for ${reading.label} over ${rangeLabel}`}
+          series={[{ label: 'Power', values: drawn.watts, color }]}
+          band={{ lo: drawn.lo, hi: drawn.hi }}
+        />
+        <Stats
+          values={series.watts}
+          lo={series.wattsLo}
+          hi={series.wattsHi}
+          unit=" W"
+          digits={0}
+        />
+      </section>
+
+      {used && (
+        <section className="panel">
+          <h3 className="panel-title">Energy used</h3>
+          <p className="panel-sub">
+            {used.estimated
+              ? `Estimated from average power over ${rangeLabel}; gaps in the data are not counted.`
+              : `From the meter’s energy counter over ${rangeLabel}.`}
+          </p>
+          <div className="sheet-now">
+            <span className="hero">
+              {used.estimated ? '≈ ' : ''}
+              {fmtEnergy(used.kwh)}
+            </span>
+            <span>kWh</span>
+          </div>
+        </section>
+      )}
+
+      {hasVolts && (
+        <section className="panel">
+          <h3 className="panel-title">Voltage</h3>
+          <p className="panel-sub">Mains voltage at the meter over {rangeLabel}.</p>
+          <TimeChart
+            t={t}
+            range={range}
+            unit=" V"
+            height={160}
+            ariaLabel={`Voltage for ${reading.label} over ${rangeLabel}`}
+            series={[{ label: 'Voltage', values: drawn.volts, color }]}
+          />
+          <Stats values={series.volts} unit=" V" />
+        </section>
+      )}
+    </>
+  );
+}
+
 /**
  * Full history for a single sensor.
  *
@@ -56,9 +178,13 @@ export default function DetailSheet({
 
   // Bridged copies are for drawing only; statistics and the table below use the
   // raw series so no interpolated value is ever reported as a reading.
+  const isPower = reading.kind === 'power';
   const drawn = useMemo(() => {
     if (!series) return null;
     const b = (v) => bridgeGaps(v, bucketSec, series.bridgeSec);
+    if (series.kind === 'power') {
+      return { watts: b(series.watts), volts: b(series.volts), lo: b(series.wattsLo), hi: b(series.wattsHi) };
+    }
     return { temp: b(series.temp), hum: b(series.hum), lo: b(series.tempLo), hi: b(series.tempHi) };
   }, [series, bucketSec]);
 
@@ -79,6 +205,8 @@ export default function DetailSheet({
 
   const hasHistory = series && t.length > 0;
   const battery = fmtBattery(reading.battery, reading.batteryKind);
+  const power = fmtPower(reading.watts);
+  const historyProps = { reading, series, drawn, t, bucketSec, range, rangeLabel, color };
 
   return (
     <>
@@ -96,10 +224,19 @@ export default function DetailSheet({
         <div className="sheet-head">
           <div>
             <h2>{reading.label}</h2>
-            <div className="sheet-now">
-              <span className="hero">{fmtTemp(reading.tempC)}°</span>
-              <span>{fmtHum(reading.humidity)}% humidity</span>
-            </div>
+            {isPower ? (
+              <div className="sheet-now">
+                <span className="hero">
+                  {power.value} {power.unit}
+                </span>
+                <span>{fmtElectrical(reading.volts, reading.amps)}</span>
+              </div>
+            ) : (
+              <div className="sheet-now">
+                <span className="hero">{fmtTemp(reading.tempC)}°</span>
+                <span>{fmtHum(reading.humidity)}% humidity</span>
+              </div>
+            )}
             <div className="card-note" style={{ marginTop: 6 }}>
               {reading.stale && <span className="dot bad" aria-hidden="true" />}
               {fmtAge(reading.ageSec)}
@@ -122,38 +259,7 @@ export default function DetailSheet({
           <p className="empty">No history for this sensor in the selected range.</p>
         ) : (
           <div className="stack">
-            <section className="panel">
-              <h3 className="panel-title">Temperature</h3>
-              <p className="panel-sub">
-                Bucket average over {rangeLabel}. The shaded band spans the lowest and
-                highest reading within each bucket, so it stays narrow while the sensor
-                holds steady.
-              </p>
-              <TimeChart
-                t={t}
-                range={range}
-                unit="°C"
-                height={210}
-                ariaLabel={`Temperature for ${reading.label} over ${rangeLabel}`}
-                series={[{ label: 'Temperature', values: drawn.temp, color }]}
-                band={{ lo: drawn.lo, hi: drawn.hi }}
-              />
-              <Stats values={series.temp} unit="°C" />
-            </section>
-
-            <section className="panel">
-              <h3 className="panel-title">Humidity</h3>
-              <p className="panel-sub">Relative humidity over {rangeLabel}.</p>
-              <TimeChart
-                t={t}
-                range={range}
-                unit="%"
-                height={180}
-                ariaLabel={`Humidity for ${reading.label} over ${rangeLabel}`}
-                series={[{ label: 'Humidity', values: drawn.hum, color }]}
-              />
-              <Stats values={series.hum} unit="%" digits={0} />
-            </section>
+            {isPower ? <PowerHistory {...historyProps} /> : <ClimateHistory {...historyProps} />}
 
             <div>
               <button
@@ -169,10 +275,19 @@ export default function DetailSheet({
                   t={t}
                   range={range}
                   caption={`${reading.label} readings over ${rangeLabel}`}
-                  columns={[
-                    { label: 'Temp °C', values: series.temp },
-                    { label: 'Humidity %', values: series.hum, digits: 0 },
-                  ]}
+                  columns={
+                    isPower
+                      ? [
+                          { label: 'Power W', values: series.watts, digits: 0 },
+                          { label: 'Peak W', values: series.wattsHi, digits: 0 },
+                          { label: 'Current A', values: series.amps, digits: 2 },
+                          { label: 'Voltage V', values: series.volts },
+                        ].filter((c) => c.values.some((v) => v != null))
+                      : [
+                          { label: 'Temp °C', values: series.temp },
+                          { label: 'Humidity %', values: series.hum, digits: 0 },
+                        ]
+                  }
                 />
               )}
             </div>
