@@ -1,13 +1,16 @@
-// Floor plan: an image per floor plus where each sensor sits on it.
+// Floor plan: each floor drawn from a JSON layout of rooms, doors, windows and
+// stairs, plus where each sensor sits on it. The browser renders it as SVG in
+// the dashboard's own theme, so colours and rooms change by editing data, not
+// by redrawing an image.
 //
-// The real plan identifies the house, so it never lives in the repository. It
-// is read from FLOORPLAN_DIR (default `floorplan/` at the repo root, which is
+// The real layout identifies the house, so it never lives in the repository.
+// It is read from FLOORPLAN_DIR (default `floorplan/` at the repo root, which is
 // gitignored and mounted into the container read-only). When that folder has
 // no `floorplan.json`, the generic example in `server/floorplan-example/` is
 // served instead so the view still works out of the box.
 //
-// The config is re-read on every request, so editing positions on the host
-// shows up on the next page load without a restart.
+// The file is re-read on every request, so editing it on the host shows up on
+// the next page load without a restart.
 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -19,17 +22,97 @@ const LOCAL_DIR = path.resolve(process.env.FLOORPLAN_DIR || path.join(ROOT, 'flo
 const EXAMPLE_DIR = path.join(ROOT, 'server', 'floorplan-example');
 const CONFIG = 'floorplan.json';
 
-export const IMAGE_TYPES = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-};
-
 const KNOWN_IDS = new Set(SENSORS.map((s) => s.id));
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+// Colours are handed to SVG attributes, so only plain colour values pass:
+// hex, a named colour, or one of the theme's own custom properties.
+const COLOUR = /^(#[0-9a-f]{3,8}|[a-z]{3,20}|var\(--[a-z0-9-]{1,40}\))$/i;
+
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const text = (v, max = 60) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+const colour = (v) => (typeof v === 'string' && COLOUR.test(v) ? v : undefined);
+const list = (v) => (Array.isArray(v) ? v : []);
+
+function point(p) {
+  const x = num(p?.[0]);
+  const y = num(p?.[1]);
+  return x == null || y == null ? null : [x, y];
+}
+
+/**
+ * A room is a rectangle `rect: [x, y, w, h]` or a polygon `points: [[x, y], ...]`.
+ * It is passed on in the form it was written, so an exported layout stays as
+ * easy to edit as the one it came from.
+ */
+function shape(item) {
+  if (Array.isArray(item?.rect)) {
+    const rect = item.rect.map(num);
+    const [, , w, h] = rect;
+    return rect.length === 4 && rect.every((v) => v != null) && w > 0 && h > 0 ? { rect } : null;
+  }
+  const points = list(item?.points).map(point);
+  return points.length >= 3 && points.every(Boolean) ? { points } : null;
+}
+
+/** Doors and windows are a segment drawn over a wall: `from` and `to`. */
+function segment(item) {
+  const from = point(item?.from);
+  const to = point(item?.to);
+  return from && to ? { from, to } : null;
+}
+
+function normaliseFloor(f, i) {
+  const width = num(f?.width);
+  const height = num(f?.height);
+  if (!(width > 0 && height > 0)) return null;
+
+  const rooms = list(f.rooms)
+    .map((r) => {
+      const geometry = shape(r);
+      if (!geometry) return null;
+      const label = point(r.label);
+      return {
+        name: text(r.name) ?? '',
+        ...geometry,
+        ...(label && { label }),
+        ...(colour(r.fill) && { fill: r.fill }),
+        // Shrinks or enlarges the name, for cupboards and other small rooms.
+        ...(num(r.labelSize) > 0 && { labelSize: Math.min(3, num(r.labelSize)) }),
+      };
+    })
+    .filter(Boolean);
+
+  const stairs = list(f.stairs)
+    .map((s) => {
+      const [x, y, w, h] = list(s?.rect).map(num);
+      if ([x, y, w, h].some((v) => v == null) || w <= 0 || h <= 0) return null;
+      const steps = Math.min(30, Math.max(2, Math.round(num(s.steps) ?? 10)));
+      return { rect: [x, y, w, h], steps, along: s.along === 'y' ? 'y' : 'x' };
+    })
+    .filter(Boolean);
+
+  // Markers sit in the same units as the rooms and are clamped onto the floor.
+  const markers = {};
+  for (const [id, pos] of Object.entries(f.markers ?? {})) {
+    const x = num(pos?.x);
+    const y = num(pos?.y);
+    if (KNOWN_IDS.has(id) && x != null && y != null) {
+      markers[id] = { x: Math.min(width, Math.max(0, x)), y: Math.min(height, Math.max(0, y)) };
+    }
+  }
+
+  return {
+    id: text(f.id, 40) ?? `floor${i + 1}`,
+    label: text(f.label) ?? `Floor ${i + 1}`,
+    width,
+    height,
+    rooms,
+    doors: list(f.doors).map(segment).filter(Boolean),
+    windows: list(f.windows).map(segment).filter(Boolean),
+    stairs,
+    markers,
+  };
+}
 
 async function readConfig(dir) {
   try {
@@ -40,61 +123,12 @@ async function readConfig(dir) {
   }
 }
 
-/**
- * Validate the config into the shape the client gets. Image names are reduced
- * to a bare filename with an allowed extension, so the config can never point
- * the image route outside its folder. Markers for unknown sensor ids are
- * dropped and coordinates (fractions of the image width and height) clamped.
- */
-function normalise(raw) {
-  const floors = Array.isArray(raw?.floors) ? raw.floors : [];
-  return floors
-    .map((f, i) => {
-      const image = typeof f?.image === 'string' ? path.basename(f.image) : '';
-      if (!IMAGE_TYPES[path.extname(image).toLowerCase()]) return null;
-      const markers = {};
-      for (const [id, pos] of Object.entries(f.markers ?? {})) {
-        const x = Number(pos?.x);
-        const y = Number(pos?.y);
-        if (KNOWN_IDS.has(id) && Number.isFinite(x) && Number.isFinite(y)) {
-          markers[id] = { x: clamp01(x), y: clamp01(y) };
-        }
-      }
-      return {
-        id: typeof f.id === 'string' && f.id ? f.id : `floor${i + 1}`,
-        label: typeof f.label === 'string' && f.label ? f.label : `Floor ${i + 1}`,
-        image,
-        markers,
-      };
-    })
-    .filter(Boolean);
-}
-
-async function load() {
-  const local = await readConfig(LOCAL_DIR);
-  if (local) return { source: 'local', dir: LOCAL_DIR, floors: normalise(local) };
-  return { source: 'example', dir: EXAMPLE_DIR, floors: normalise(await readConfig(EXAMPLE_DIR)) };
-}
-
-/** Public payload: floors with an image URL each. No host paths leak out. */
+/** The plan as the client gets it. No host paths leak out. */
 export async function floorplan() {
-  const { source, floors } = await load();
+  const local = await readConfig(LOCAL_DIR);
+  const raw = local ?? (await readConfig(EXAMPLE_DIR));
   return {
-    source,
-    floors: floors.map((f) => ({
-      ...f,
-      imageUrl: `/api/floorplan/image/${encodeURIComponent(f.id)}`,
-    })),
-  };
-}
-
-/** Resolve a floor id to its image file, or null if there is no such floor. */
-export async function floorImage(floorId) {
-  const { dir, floors } = await load();
-  const floor = floors.find((f) => f.id === floorId);
-  if (!floor) return null;
-  return {
-    file: path.join(dir, floor.image),
-    type: IMAGE_TYPES[path.extname(floor.image).toLowerCase()],
+    source: local ? 'local' : 'example',
+    floors: list(raw?.floors).map(normaliseFloor).filter(Boolean),
   };
 }

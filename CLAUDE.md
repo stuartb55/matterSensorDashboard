@@ -79,11 +79,12 @@ The whole frontend assumes this shared axis; charts, sparklines and tables index
 into it directly.
 
 **The floor plan is host data, never repo data.** `server/floorplan.js` reads
-`floorplan/floorplan.json` and its images from `FLOORPLAN_DIR` (gitignored,
-dockerignored, mounted read-only), falling back to the generic
-`server/floorplan-example/`. A real plan identifies the house: never commit
-one, nor anything derived from a property listing. Positions are fractions of
-the image size; the browser exports edits as JSON and the server never writes.
+`floorplan/floorplan.json` from `FLOORPLAN_DIR` (gitignored, dockerignored,
+mounted read-only), falling back to the generic `server/floorplan-example/`.
+It is a layout of rooms, doors, windows and stairs that `PlanDrawing.jsx`
+renders as SVG in theme colours; marker positions share the layout's units. A
+real layout identifies the house: never commit one, nor anything derived from a
+property listing. The browser exports edits as JSON and the server never writes.
 
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on

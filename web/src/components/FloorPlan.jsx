@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { seriesVar } from '../palette.js';
 import { fmtAge, fmtHum, fmtPower, fmtTemp } from '../format.js';
+import PlanDrawing from './PlanDrawing.jsx';
 
 const DRAFT_KEY = 'floorplan-draft';
 
@@ -24,7 +25,6 @@ function writeDraft(value) {
 }
 
 const markersOf = (floors) => Object.fromEntries(floors.map((f) => [f.id, { ...f.markers }]));
-const round = (v) => Math.round(v * 1000) / 1000;
 
 /** What a marker shows: a short value line plus a full sentence for screen readers. */
 function describe(r) {
@@ -70,12 +70,12 @@ export default function FloorPlan({ plan, readings, onOpen }) {
   const placedAnywhere = new Set(Object.values(positions).flatMap((m) => Object.keys(m)));
   const unplaced = (readings ?? []).filter((r) => !placedAnywhere.has(r.id));
 
-  const pointToFraction = (e) => {
+  // Pointer position in the floor's own layout units, clamped onto the floor.
+  const pointToPlan = (e) => {
     const rect = surface.current.getBoundingClientRect();
-    return {
-      x: round(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))),
-      y: round(Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))),
-    };
+    const fx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const fy = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    return { x: Math.round(fx * floor.width), y: Math.round(fy * floor.height) };
   };
 
   const move = (id, pos) =>
@@ -98,7 +98,7 @@ export default function FloorPlan({ plan, readings, onOpen }) {
 
   const onSurfaceClick = (e) => {
     if (!editing || !placing) return;
-    move(placing, pointToFraction(e));
+    move(placing, pointToPlan(e));
     setPlacing(null);
   };
 
@@ -109,7 +109,7 @@ export default function FloorPlan({ plan, readings, onOpen }) {
     drag.current = id;
   };
   const onMarkerMove = (id) => (e) => {
-    if (drag.current === id) move(id, pointToFraction(e));
+    if (drag.current === id) move(id, pointToPlan(e));
   };
   const onMarkerUp = () => {
     drag.current = null;
@@ -118,12 +118,7 @@ export default function FloorPlan({ plan, readings, onOpen }) {
   const exportJson = () =>
     JSON.stringify(
       {
-        floors: plan.floors.map(({ id, label, image }) => ({
-          id,
-          label,
-          image,
-          markers: positions[id] ?? {},
-        })),
+        floors: plan.floors.map((f) => ({ ...f, markers: positions[f.id] ?? {} })),
       },
       null,
       2,
@@ -185,8 +180,8 @@ export default function FloorPlan({ plan, readings, onOpen }) {
 
       {plan.source === 'example' && (
         <p className="panel-sub">
-          This is the example plan. Put your own image and <code>floorplan.json</code> in the
-          server’s <code>floorplan/</code> folder to replace it.
+          This is the example plan. Put your own <code>floorplan.json</code> in the server’s{' '}
+          <code>floorplan/</code> folder to replace it.
         </p>
       )}
 
@@ -239,7 +234,7 @@ export default function FloorPlan({ plan, readings, onOpen }) {
         className={`floorplan-surface${editing ? ' is-editing' : ''}${placing ? ' is-placing' : ''}`}
         onClick={onSurfaceClick}
       >
-        <img src={floor.imageUrl} alt={`${floor.label} plan`} draggable={false} />
+        <PlanDrawing floor={floor} />
         {Object.entries(here).map(([id, pos]) => {
           const r = byId.get(id);
           if (!r) return null;
@@ -254,10 +249,12 @@ export default function FloorPlan({ plan, readings, onOpen }) {
               : '';
           // The anchor slides across the marker with its position, so a sensor
           // placed against an outside wall stays fully on the plan.
+          const fx = pos.x / floor.width;
+          const fy = pos.y / floor.height;
           const style = {
-            left: `${pos.x * 100}%`,
-            top: `${pos.y * 100}%`,
-            transform: `translate(${-pos.x * 100}%, ${-pos.y * 100}%)`,
+            left: `${fx * 100}%`,
+            top: `${fy * 100}%`,
+            transform: `translate(${-fx * 100}%, ${-fy * 100}%)`,
           };
           const status = r.stale ? `, offline, last seen ${fmtAge(r.ageSec)}` : '';
           const body = (

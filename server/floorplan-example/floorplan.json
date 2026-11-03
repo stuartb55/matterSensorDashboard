@@ -3,63 +3,69 @@
     {
       "id": "ground",
       "label": "Ground floor",
-      "image": "ground.svg",
+      "width": 800,
+      "height": 500,
+      "rooms": [
+        { "name": "Living Room", "rect": [20, 20, 380, 280] },
+        { "name": "Kitchen", "rect": [400, 20, 380, 280] },
+        { "name": "Hallway", "rect": [20, 300, 280, 180] },
+        { "name": "Closet", "rect": [300, 300, 140, 180] },
+        { "name": "Garage", "rect": [440, 300, 340, 180], "fill": "var(--plan-outbuilding)" }
+      ],
+      "doors": [
+        { "from": [120, 300], "to": [190, 300] },
+        { "from": [240, 300], "to": [290, 300] },
+        { "from": [300, 360], "to": [300, 420] },
+        { "from": [440, 360], "to": [440, 420] },
+        { "from": [780, 40], "to": [780, 100] },
+        { "from": [520, 480], "to": [720, 480] }
+      ],
+      "windows": [
+        { "from": [100, 20], "to": [320, 20] },
+        { "from": [480, 20], "to": [700, 20] },
+        { "from": [60, 480], "to": [110, 480] }
+      ],
+      "stairs": [{ "rect": [180, 400, 110, 70], "steps": 8, "along": "x" }],
       "markers": {
-        "living_room": {
-          "x": 0.24,
-          "y": 0.3
-        },
-        "ruuvi_air": {
-          "x": 0.12,
-          "y": 0.48
-        },
-        "kitchen": {
-          "x": 0.72,
-          "y": 0.3
-        },
-        "back_door": {
-          "x": 0.96,
-          "y": 0.08
-        },
-        "hallway": {
-          "x": 0.1,
-          "y": 0.74
-        },
-        "closet": {
-          "x": 0.47,
-          "y": 0.8
-        },
-        "network_power": {
-          "x": 0.28,
-          "y": 0.94
-        },
-        "garage": {
-          "x": 0.8,
-          "y": 0.8
-        }
+        "living_room": { "x": 190, "y": 150 },
+        "ruuvi_air": { "x": 100, "y": 240 },
+        "kitchen": { "x": 580, "y": 150 },
+        "back_door": { "x": 770, "y": 70 },
+        "hallway": { "x": 90, "y": 370 },
+        "network_power": { "x": 230, "y": 360 },
+        "closet": { "x": 370, "y": 400 },
+        "garage": { "x": 640, "y": 400 }
       }
     },
     {
       "id": "first",
       "label": "First floor",
-      "image": "first.svg",
+      "width": 800,
+      "height": 500,
+      "rooms": [
+        { "name": "Bedroom", "rect": [20, 20, 380, 280] },
+        { "name": "Office", "rect": [400, 20, 380, 280] },
+        { "name": "Bathroom", "rect": [20, 300, 280, 180] },
+        { "name": "Landing", "rect": [300, 300, 260, 180] },
+        { "name": "Airing cupboard", "rect": [560, 300, 220, 180] }
+      ],
+      "doors": [
+        { "from": [320, 300], "to": [380, 300] },
+        { "from": [480, 300], "to": [540, 300] },
+        { "from": [300, 360], "to": [300, 420] },
+        { "from": [560, 360], "to": [560, 420] }
+      ],
+      "windows": [
+        { "from": [100, 20], "to": [320, 20] },
+        { "from": [480, 20], "to": [700, 20] },
+        { "from": [80, 480], "to": [200, 480] }
+      ],
+      "stairs": [{ "rect": [330, 400, 110, 70], "steps": 8, "along": "x" }],
       "markers": {
-        "bedroom": {
-          "x": 0.26,
-          "y": 0.34
-        },
-        "office": {
-          "x": 0.74,
-          "y": 0.34
-        },
-        "bathroom": {
-          "x": 0.15,
-          "y": 0.8
-        },
-        "hot_water": {
-          "x": 0.86,
-          "y": 0.8
-        }
+        "bedroom": { "x": 210, "y": 160 },
+        "office": { "x": 590, "y": 160 },
+        "bathroom": { "x": 160, "y": 400 },
+        "hot_water": { "x": 670, "y": 400 }
       }
     }
   ]

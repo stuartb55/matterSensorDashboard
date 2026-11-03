@@ -31,6 +31,15 @@
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
 
+  /* Floor plan. Rooms take --plan-room unless the layout gives a fill. */
+  --plan-floor: #ffffff;
+  --plan-room: #f4f3ef;
+  --plan-outbuilding: #e9e8e2;
+  --plan-wall: #3b3a36;
+  --plan-stairs: #c3c2b7;
+  --plan-window: #8fb8e0;
+  --plan-label: #6b6a64;
+
   --radius: 14px;
   --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -58,6 +67,14 @@
     --series-6: #008300;
     --series-7: #9085e9;
     --series-8: #e66767;
+
+    --plan-floor: #121211;
+    --plan-room: #1f1f1d;
+    --plan-outbuilding: #262624;
+    --plan-wall: #b5b4ab;
+    --plan-stairs: #4a4945;
+    --plan-window: #4f7fae;
+    --plan-label: #a3a29a;
   }
 }
 
@@ -83,6 +100,14 @@
   --series-6: #008300;
   --series-7: #9085e9;
   --series-8: #e66767;
+
+  --plan-floor: #121211;
+  --plan-room: #1f1f1d;
+  --plan-outbuilding: #262624;
+  --plan-wall: #b5b4ab;
+  --plan-stairs: #4a4945;
+  --plan-window: #4f7fae;
+  --plan-label: #a3a29a;
 }
 
 * {
@@ -733,15 +758,37 @@ tbody tr:last-child td {
   margin: 0 auto;
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--plan-floor);
   user-select: none;
   -webkit-user-select: none;
 }
-.floorplan-surface img {
+.plan-svg {
   display: block;
   width: 100%;
   height: auto;
   pointer-events: none;
+}
+.plan-rooms polygon {
+  fill: var(--plan-room);
+  stroke: var(--plan-wall);
+}
+.plan-stairs rect,
+.plan-stairs line {
+  fill: none;
+  stroke: var(--plan-stairs);
+}
+.plan-doors line {
+  stroke: var(--plan-room);
+}
+.plan-windows .pane {
+  stroke: var(--plan-floor);
+}
+.plan-windows .glass {
+  stroke: var(--plan-window);
+}
+.plan-labels text {
+  fill: var(--plan-label);
+  font-family: var(--font);
 }
 .floorplan-surface.is-editing {
   outline: 2px dashed var(--axis);

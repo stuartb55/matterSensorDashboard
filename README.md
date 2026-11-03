@@ -72,33 +72,21 @@ npm run dev:web        # Vite dev server on :5174, proxies /api to :8090
 
 ## Floor plan
 
-The Floor plan section shows each floor's plan with every sensor's live reading
-pinned where it is. Tap a sensor to open its detail sheet.
+The Floor plan section draws each floor of the house and pins every sensor's
+live reading where it is. Tap a sensor to open its detail sheet.
 
-A plan of the house identifies it, so the real one never goes in this
-repository. The server reads it from a `floorplan/` folder next to
+The plan is drawn in the browser as SVG from a JSON layout of rooms, doors,
+windows and stairs, so changing a colour or adding a room is an edit to that
+file, not a new image. Colours come from the theme (`--plan-room`,
+`--plan-wall`, `--plan-window` and friends in `web/src/theme.css`), so the plan
+follows light and dark mode, and any room can take its own `fill`.
+
+A layout of the house identifies it, so the real one never goes in this
+repository. The server reads `floorplan.json` from a `floorplan/` folder next to
 `docker-compose.yml` (gitignored, mounted read-only at `/app/floorplan`; set
 `FLOORPLAN_DIR` to read it from elsewhere when running without Docker). Until
-that folder has a `floorplan.json`, the generic example in
-`server/floorplan-example/` is shown.
-
-To set it up on the host:
-
-1. Save each floor's plan image (`.png`, `.jpg`, `.webp`, `.gif` or `.svg`)
-   into `floorplan/`, for example `floorplan/ground.png` and
-   `floorplan/first.png`. If one image holds both floors, crop it into two.
-2. Copy `server/floorplan-example/floorplan.json` into `floorplan/` and change
-   each floor's `image` to your file name.
-3. Open the dashboard, tap **Edit positions**, drag each sensor to where it
-   really is (tap a sensor in the list, then the plan, to add one that isn't
-   placed yet), then **Copy floorplan.json** or **Download** and replace
-   `floorplan/floorplan.json` with it.
-
-The file is re-read on every page load, so no restart is needed. Positions are
-fractions of the image's width and height (`x` 0 to 1 from the left, `y` 0 to 1
-from the top), so they survive swapping in a higher resolution image. Unsaved
-edits are kept in the browser until they're exported or discarded; the server
-never writes the file itself.
+that file exists, the generic example in `server/floorplan-example/` is shown,
+which is also the best starting point for your own.
 
 ```json
 {
@@ -106,14 +94,39 @@ never writes the file itself.
     {
       "id": "ground",
       "label": "Ground floor",
-      "image": "ground.png",
-      "markers": { "kitchen": { "x": 0.72, "y": 0.3 } }
+      "width": 800,
+      "height": 500,
+      "rooms": [
+        { "name": "Kitchen", "rect": [400, 20, 380, 280] },
+        { "name": "Garage", "rect": [440, 300, 340, 180], "fill": "var(--plan-outbuilding)" },
+        { "name": "Bay room", "points": [[20, 60], [60, 20], [360, 20], [400, 60], [400, 300], [20, 300]] }
+      ],
+      "doors": [{ "from": [780, 40], "to": [780, 100] }],
+      "windows": [{ "from": [480, 20], "to": [700, 20] }],
+      "stairs": [{ "rect": [180, 400, 110, 70], "steps": 8, "along": "x" }],
+      "markers": { "kitchen": { "x": 580, "y": 150 } }
     }
   ]
 }
 ```
 
-Marker keys are sensor ids from `server/sensors.js`; unknown ids are ignored.
+- Units are whatever you like (pixels, centimetres): `width` and `height` set
+  the drawing's size and everything else is in the same units, with `0, 0` at
+  the top left. Leave a margin round the outside walls.
+- A room is a `rect` (`[x, y, width, height]`) or a polygon of `points`. Its
+  `name` is centred unless `label: [x, y]` places it; `labelSize` scales it for
+  small rooms. Rooms are drawn in order, so a cupboard listed after the landing
+  sits on top of it. `fill` takes a hex colour, a colour name or `var(--token)`.
+- Doors are gaps cut into a wall and windows are panes drawn over it, each a
+  segment from `from` to `to` along the wall.
+- `markers` maps sensor ids from `server/sensors.js` to where they sit; unknown
+  ids are ignored. The easiest way to set them is **Edit positions** in the
+  dashboard: drag each sensor into place (tap one in the list, then the plan, to
+  add one that isn't placed), then **Copy floorplan.json** or **Download** and
+  replace the file. Unsaved edits stay in the browser until exported or
+  discarded; the server never writes the file itself.
+
+The file is re-read on every page load, so no restart is needed.
 
 ## CI and dependencies
 
@@ -142,8 +155,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/sensors` | Sensor registry |
 | `GET /api/readings/latest` | Current reading per sensor, 10s server-side cache |
 | `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
-| `GET /api/floorplan` | Floors, their image URLs and sensor positions |
-| `GET /api/floorplan/image/:floor` | The image for one floor |
+| `GET /api/floorplan` | Floor layouts and sensor positions |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`. No SQL reaches the
 backend from the browser.
