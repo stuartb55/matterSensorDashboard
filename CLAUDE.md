@@ -31,7 +31,7 @@ for them; verify changes by running the app against the live database.
 
 CI (`.github/workflows/ci.yml`) is the only automated check: build the frontend,
 boot the server against a closed port and assert what holds without InfluxDB
-(registry, static build, 503 health, API 404, example floor plan), then build
+(registry, static build, 503 health, API 404, example floor plan, Hue off), then build
 the image. Reproduce it locally with `npm run build`
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
@@ -85,6 +85,14 @@ It is a layout of rooms, doors, windows and stairs that `PlanDrawing.jsx`
 renders as SVG in theme colours; marker positions share the layout's units. A
 real layout identifies the house: never commit one, nor anything derived from a
 property listing. The browser exports edits as JSON and the server never writes.
+
+**Hue lights come from the bridge, not InfluxDB.** `server/hue.js` reads the
+Hue Bridge's CLIP v2 API (`HUE_BRIDGE`, `HUE_APP_KEY` from `.env`) and groups
+lights by Hue room into `lights:<slug>` entries; it is the only module that
+talks to the bridge and it never writes to it. The feature is off when either
+value is missing. Lights have no history and no detail sheet. Floor plan
+markers accept `lights:` ids by pattern, since they are not in the registry. A
+bridge failure dims the Lights section but never sets the sensor error banner.
 
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on

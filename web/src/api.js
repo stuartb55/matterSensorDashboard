@@ -32,3 +32,5 @@ export const RANGES = [
 ];
 
 export const getFloorplan = (signal) => getJson('/api/floorplan', signal);
+
+export const getLights = (signal) => getJson('/api/lights', signal);

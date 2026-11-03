@@ -130,6 +130,26 @@ which is also the best starting point for your own.
 
 The file is re-read on every page load, so no restart is needed.
 
+## Hue lights
+
+Philips Hue lights are read live from the Hue Bridge's local API and shown
+view-only: one card per room set up in the Hue app, with each bulb's on/off
+state and brightness. Nothing is written to the bridge. Lights skip InfluxDB, so
+there is no history, only what is on now.
+
+Set two values in `.env` (see `.env.example`):
+
+- `HUE_BRIDGE`: the bridge's LAN address.
+- `HUE_APP_KEY`: press the round link button on the bridge, then within 30
+  seconds run
+  `curl -k -X POST https://<bridge-address>/api -d '{"devicetype":"sensordashboard#server","generateclientkey":true}'`
+  and use the `username` it returns.
+
+Without them the Lights section is hidden. A bulb switched off at the wall shows
+as unreachable rather than off. Each Hue room can also go on the floor plan:
+it appears in **Edit positions** as "<room> lights" and is stored in
+`floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
+
 ## CI and dependencies
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
@@ -158,6 +178,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/readings/latest` | Current reading per sensor, 10s server-side cache |
 | `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
 | `GET /api/floorplan` | Floor layouts and sensor positions |
+| `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`. No SQL reaches the
 backend from the browser.

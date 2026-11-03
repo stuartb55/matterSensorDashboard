@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { seriesVar } from '../palette.js';
 import { fmtAge, fmtHum, fmtPower, fmtTemp } from '../format.js';
 import PlanDrawing from './PlanDrawing.jsx';
+import { lightsSummary } from './LightCard.jsx';
 
 const DRAFT_KEY = 'floorplan-draft';
 
@@ -37,6 +38,10 @@ function describe(r) {
   if (r.kind === 'door') {
     const state = r.closed == null ? 'Unknown' : r.closed ? 'Closed' : 'Open';
     return { value: state, spoken: state };
+  }
+  if (r.kind === 'lights') {
+    const { value, spoken } = lightsSummary(r);
+    return { value, spoken: `lights ${spoken}` };
   }
   if (r.kind === 'power') {
     const p = fmtPower(r.watts);
@@ -263,7 +268,12 @@ export default function FloorPlan({ plan, readings, onOpen }) {
                   : r.closed
                     ? ' is-closed'
                     : ' is-open'
-                : '';
+                : r.kind === 'lights'
+                  ? ` is-lights is-${lightsSummary(r).state}`
+                  : '';
+            // Doors and lights show a state indicator; everything else its series colour.
+            const keyClass =
+              r.kind === 'door' ? ' door-indicator' : r.kind === 'lights' ? ' light-indicator' : '';
             // The anchor slides across the marker with its position, so a sensor
             // placed against an outside wall stays fully on the plan.
             const fx = pos.x / floor.width;
@@ -273,18 +283,22 @@ export default function FloorPlan({ plan, readings, onOpen }) {
               top: `${fy * 100}%`,
               transform: `translate(${-fx * 100}%, ${-fy * 100}%)`,
             };
-            const status = r.stale ? `, offline, last seen ${fmtAge(r.ageSec)}` : '';
+            const status = r.stale
+              ? r.ageSec != null
+                ? `, offline, last seen ${fmtAge(r.ageSec)}`
+                : ', offline'
+              : '';
             const body = (
               <>
                 <span className="marker-label">
                   <span
-                    className={`marker-key${r.kind === 'door' ? ` door-indicator${doorClass}` : ''}`}
-                    style={r.kind === 'door' ? undefined : { background: seriesVar(id) }}
+                    className={`marker-key${keyClass}${keyClass ? doorClass : ''}`}
+                    style={keyClass ? undefined : { background: seriesVar(id) }}
                     aria-hidden="true"
                   />
                   {r.label}
                 </span>
-                <span className="marker-value">{r.stale ? fmtAge(r.ageSec) : value}</span>
+                <span className="marker-value">{r.stale && r.ageSec != null ? fmtAge(r.ageSec) : value}</span>
               </>
             );
             const className = `marker${r.stale ? ' is-stale' : ''}${doorClass}`;
@@ -314,8 +328,8 @@ export default function FloorPlan({ plan, readings, onOpen }) {
                 </div>
               );
             }
-            // Doors have no history chart, so they have nothing to open.
-            if (r.kind === 'door') {
+            // Doors and lights have no history chart, so they have nothing to open.
+            if (r.kind === 'door' || r.kind === 'lights') {
               return (
                 <div key={id} className={className} style={style} aria-label={`${r.label}: ${spoken}${status}`}>
                   {body}
