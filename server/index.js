@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { influxUrl, InfluxError } from './influx.js';
 import { fetchLatest, fetchHistory, probeUpstream, RANGES, DEFAULT_RANGE } from './queries.js';
 import { publicRegistry } from './sensors.js';
+import { floorplan, floorImage } from './floorplan.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -59,6 +60,27 @@ app.get('/health', async (_req, reply) => {
 });
 
 app.get('/api/sensors', async () => ({ sensors: publicRegistry() }));
+
+app.get('/api/floorplan', async (_req, reply) => {
+  try {
+    return await floorplan();
+  } catch (err) {
+    app.log.error({ err: err.message }, 'floor plan config unreadable');
+    return reply.code(500).send({ error: 'bad_floorplan', message: err.message });
+  }
+});
+
+app.get('/api/floorplan/image/:floor', async (req, reply) => {
+  const img = await floorImage(req.params.floor);
+  if (!img) return reply.code(404).send({ error: 'not_found' });
+  try {
+    const body = await fs.promises.readFile(img.file);
+    // Revalidated on every load so a replaced plan shows up straight away.
+    return reply.type(img.type).header('Cache-Control', 'no-cache').send(body);
+  } catch {
+    return reply.code(404).send({ error: 'not_found' });
+  }
+});
 
 app.get('/api/readings/latest', async (_req, reply) => {
   try {

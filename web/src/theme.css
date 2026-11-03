@@ -680,3 +680,163 @@ tbody tr:last-child td {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------ floor plan */
+
+.floorplan-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.floorplan-bar .panel-title {
+  margin-bottom: 0;
+}
+.floor-tabs {
+  margin: 0;
+  min-width: 0;
+}
+.floorplan .link-btn[aria-pressed='true'] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.floorplan code {
+  font-size: 0.95em;
+}
+
+.floorplan-edit .chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.chip[aria-pressed='true'] {
+  background: var(--text-primary);
+  color: var(--page);
+  border-color: transparent;
+}
+
+/* Markers are positioned in percent of this box, which is exactly the image. */
+.floorplan-surface {
+  position: relative;
+  max-width: 820px;
+  margin: 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.floorplan-surface img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.floorplan-surface.is-editing {
+  outline: 2px dashed var(--axis);
+  outline-offset: -2px;
+}
+.floorplan-surface.is-placing {
+  cursor: crosshair;
+}
+
+.marker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 8px 5px;
+  min-height: 36px;
+  border-radius: 9px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(11, 11, 11, 0.18);
+  text-align: left;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+button.marker:active {
+  background: var(--ghost);
+}
+.marker.is-stale {
+  opacity: 0.62;
+}
+.marker.is-draggable {
+  cursor: grab;
+  touch-action: none;
+  padding-right: 26px;
+}
+.marker-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+}
+.marker-key {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.marker-key.door-indicator {
+  background: var(--text-muted);
+}
+.marker-key.door-indicator.is-closed {
+  background: var(--status-good);
+}
+.marker-key.door-indicator.is-open {
+  background: var(--status-serious);
+}
+.marker-value {
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.marker-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+@media (max-width: 520px) {
+  .marker {
+    padding: 3px 6px 4px;
+    min-height: 32px;
+    border-radius: 7px;
+  }
+  .marker.is-draggable {
+    padding-right: 22px;
+  }
+  .marker-label {
+    font-size: 0.58rem;
+    gap: 4px;
+  }
+  .marker-key {
+    width: 6px;
+    height: 6px;
+  }
+  .marker-value {
+    font-size: 0.74rem;
+  }
+  .marker-remove {
+    width: 20px;
+  }
+}

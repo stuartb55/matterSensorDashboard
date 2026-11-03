@@ -30,8 +30,9 @@ There is no test suite, linter, or formatter configured. Don't invent commands
 for them; verify changes by running the app against the live database.
 
 CI (`.github/workflows/ci.yml`) is the only automated check: build the frontend,
-boot the server against a closed port and assert the four things that hold
-without InfluxDB, then build the image. Reproduce it locally with `npm run build`
+boot the server against a closed port and assert what holds without InfluxDB
+(registry, static build, 503 health, API 404, example floor plan), then build
+the image. Reproduce it locally with `npm run build`
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
 
@@ -76,6 +77,13 @@ length with **nulls, not zeros**. Each climate series also carries `bridgeSec`
 event-driven state, not climate series, so they are deliberately excluded.
 The whole frontend assumes this shared axis; charts, sparklines and tables index
 into it directly.
+
+**The floor plan is host data, never repo data.** `server/floorplan.js` reads
+`floorplan/floorplan.json` and its images from `FLOORPLAN_DIR` (gitignored,
+dockerignored, mounted read-only), falling back to the generic
+`server/floorplan-example/`. A real plan identifies the house: never commit
+one, nor anything derived from a property listing. Positions are fractions of
+the image size; the browser exports edits as JSON and the server never writes.
 
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on

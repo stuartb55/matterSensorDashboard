@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getHistory, getLatest, RANGES } from './api.js';
+import { getFloorplan, getHistory, getLatest, RANGES } from './api.js';
 import { fmtAge } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
 import PowerCard from './components/PowerCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
+import FloorPlan from './components/FloorPlan.jsx';
 
 const LATEST_POLL_MS = 30_000;
 const HISTORY_POLL_MS = 120_000;
@@ -27,6 +28,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [refetching, setRefetching] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [plan, setPlan] = useState(null);
 
   // Keyed by range so a stale in-flight response can't overwrite a newer one.
   const historyRange = useRef(range);
@@ -52,6 +54,16 @@ export default function App() {
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
     }
+  }, []);
+
+  // The plan only changes when the host's file does, so it is fetched once.
+  // Without one the section is simply left out.
+  useEffect(() => {
+    const ac = new AbortController();
+    getFloorplan(ac.signal)
+      .then((data) => setPlan(data.floors?.length ? data : null))
+      .catch(() => {});
+    return () => ac.abort();
   }, []);
 
   // Initial load and range changes. The previous render is held at reduced
@@ -170,6 +182,16 @@ export default function App() {
         <p className="empty">{error ? 'No readings available.' : 'Loading sensors…'}</p>
       ) : (
         <div className={refetching ? 'is-refetching' : undefined}>
+          {plan && (
+            <>
+              <div className="section-head">
+                <h2>Floor plan</h2>
+                <OfflineNote count={offline} />
+              </div>
+              <FloorPlan plan={plan} readings={readings} onOpen={setSelected} />
+            </>
+          )}
+
           {doors.length > 0 && (
             <>
               <div className="section-head">

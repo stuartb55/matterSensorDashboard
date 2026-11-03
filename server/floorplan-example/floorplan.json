@@ -1,0 +1,66 @@
+{
+  "floors": [
+    {
+      "id": "ground",
+      "label": "Ground floor",
+      "image": "ground.svg",
+      "markers": {
+        "living_room": {
+          "x": 0.24,
+          "y": 0.3
+        },
+        "ruuvi_air": {
+          "x": 0.12,
+          "y": 0.48
+        },
+        "kitchen": {
+          "x": 0.72,
+          "y": 0.3
+        },
+        "back_door": {
+          "x": 0.96,
+          "y": 0.08
+        },
+        "hallway": {
+          "x": 0.1,
+          "y": 0.74
+        },
+        "closet": {
+          "x": 0.47,
+          "y": 0.8
+        },
+        "network_power": {
+          "x": 0.28,
+          "y": 0.94
+        },
+        "garage": {
+          "x": 0.8,
+          "y": 0.8
+        }
+      }
+    },
+    {
+      "id": "first",
+      "label": "First floor",
+      "image": "first.svg",
+      "markers": {
+        "bedroom": {
+          "x": 0.26,
+          "y": 0.34
+        },
+        "office": {
+          "x": 0.74,
+          "y": 0.34
+        },
+        "bathroom": {
+          "x": 0.15,
+          "y": 0.8
+        },
+        "hot_water": {
+          "x": 0.86,
+          "y": 0.8
+        }
+      }
+    }
+  ]
+}
