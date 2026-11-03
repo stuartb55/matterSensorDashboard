@@ -54,7 +54,7 @@ function shape(item) {
   return points.length >= 3 && points.every(Boolean) ? { points } : null;
 }
 
-/** Doors and windows are a segment drawn over a wall: `from` and `to`. */
+/** Doors, windows and low walls are a segment: `from` and `to`. */
 function segment(item) {
   const from = point(item?.from);
   const to = point(item?.to);
@@ -109,6 +109,8 @@ function normaliseFloor(f, i) {
     rooms,
     doors: list(f.doors).map(segment).filter(Boolean),
     windows: list(f.windows).map(segment).filter(Boolean),
+    // Low walls, banisters and half-height partitions: drawn thinner than a wall.
+    barriers: list(f.barriers).map(segment).filter(Boolean),
     stairs,
     markers,
   };

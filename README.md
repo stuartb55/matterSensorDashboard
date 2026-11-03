@@ -118,7 +118,9 @@ which is also the best starting point for your own.
   small rooms. Rooms are drawn in order, so a cupboard listed after the landing
   sits on top of it. `fill` takes a hex colour, a colour name or `var(--token)`.
 - Doors are gaps cut into a wall and windows are panes drawn over it, each a
-  segment from `from` to `to` along the wall.
+  segment from `from` to `to` along the wall. `barriers` are low walls,
+  banisters and other half-height partitions, drawn thinner than a wall, in the
+  same `from`/`to` form.
 - `markers` maps sensor ids from `server/sensors.js` to where they sit; unknown
   ids are ignored. The easiest way to set them is **Edit positions** in the
   dashboard: drag each sensor into place (tap one in the list, then the plan, to

@@ -784,6 +784,9 @@ tbody tr:last-child td {
   fill: none;
   stroke: var(--plan-stairs);
 }
+.plan-barriers line {
+  stroke: var(--plan-wall);
+}
 .plan-doors line {
   stroke: var(--plan-room);
 }

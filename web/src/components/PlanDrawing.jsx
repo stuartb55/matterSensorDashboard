@@ -1,4 +1,4 @@
-// Draws one floor from its layout: rooms, then stairs, then the openings cut
+// Draws one floor from its layout: rooms, then stairs and low walls, then the openings cut
 // into the walls. Every colour is a theme token (overridable per room), so the
 // plan follows light and dark mode like the rest of the dashboard.
 
@@ -67,6 +67,12 @@ export default function PlanDrawing({ floor, unit: sharedUnit }) {
       <g strokeWidth={unit * 0.15}>
         {floor.stairs.map((s, i) => (
           <Stairs key={i} {...s} />
+        ))}
+      </g>
+
+      <g className="plan-barriers" strokeWidth={wall * 0.45} strokeLinecap="square">
+        {(floor.barriers ?? []).map(({ from, to }, i) => (
+          <line key={i} x1={from[0]} y1={from[1]} x2={to[0]} y2={to[1]} />
         ))}
       </g>
 
