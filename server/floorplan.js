@@ -23,6 +23,10 @@ const EXAMPLE_DIR = path.join(ROOT, 'server', 'floorplan-example');
 const CONFIG = 'floorplan.json';
 
 const KNOWN_IDS = new Set(SENSORS.map((s) => s.id));
+// Hue rooms come from the bridge, not the registry, so their markers are
+// recognised by shape: `lights:<room_slug>` (see server/hue.js).
+const LIGHTS_ID = /^lights:[a-z0-9_]{1,43}$/;
+const isMarkerId = (id) => KNOWN_IDS.has(id) || LIGHTS_ID.test(id);
 
 // Colours are handed to SVG attributes, so only plain colour values pass:
 // hex, a named colour, or one of the theme's own custom properties.
@@ -96,7 +100,7 @@ function normaliseFloor(f, i) {
   for (const [id, pos] of Object.entries(f.markers ?? {})) {
     const x = num(pos?.x);
     const y = num(pos?.y);
-    if (KNOWN_IDS.has(id) && x != null && y != null) {
+    if (isMarkerId(id) && x != null && y != null) {
       markers[id] = { x: Math.min(width, Math.max(0, x)), y: Math.min(height, Math.max(0, y)) };
     }
   }

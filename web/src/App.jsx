@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getFloorplan, getHistory, getLatest, RANGES } from './api.js';
+import { getFloorplan, getHistory, getLatest, getLights, RANGES } from './api.js';
 import { fmtAge } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
 import PowerCard from './components/PowerCard.jsx';
+import LightCard from './components/LightCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 import FloorPlan from './components/FloorPlan.jsx';
@@ -29,12 +30,28 @@ export default function App() {
   const [refetching, setRefetching] = useState(false);
   const [selected, setSelected] = useState(null);
   const [plan, setPlan] = useState(null);
+  // Hue rooms, or null until the bridge first answers (or when it isn't set up).
+  const [lights, setLights] = useState(null);
+  const [lightsError, setLightsError] = useState(null);
 
   // Keyed by range so a stale in-flight response can't overwrite a newer one.
   const historyRange = useRef(range);
   historyRange.current = range;
 
+  // Lights ride along with the latest readings but fail on their own: a bridge
+  // that is down must not make the sensor database look unreachable.
+  const loadLights = useCallback(async (signal) => {
+    try {
+      const data = await getLights(signal);
+      setLights(data.enabled ? data.rooms : null);
+      setLightsError(null);
+    } catch (err) {
+      if (err.name !== 'AbortError') setLightsError(err.message);
+    }
+  }, []);
+
   const loadLatest = useCallback(async (signal) => {
+    loadLights(signal);
     try {
       const data = await getLatest(signal);
       setReadings(data.readings);
@@ -42,7 +59,7 @@ export default function App() {
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
     }
-  }, []);
+  }, [loadLights]);
 
   const loadHistory = useCallback(async (forRange, signal) => {
     try {
@@ -129,6 +146,16 @@ export default function App() {
   const doors = readings?.filter((r) => r.kind === 'door') ?? [];
   const meters = readings?.filter((r) => r.kind === 'power') ?? [];
   const selectedReading = readings?.find((r) => r.id === selected) ?? null;
+  // The floor plan places Hue rooms alongside sensors. If the bridge stops
+  // answering, its last known state is shown dimmed rather than as current.
+  // "lights" is added to the name so a Hue room never reads like the
+  // temperature sensor of the same name next to it.
+  const lightRooms = (lights ?? []).map((l) => ({
+    ...l,
+    label: `${l.label} lights`,
+    stale: Boolean(lightsError),
+  }));
+  const planItems = readings ? [...readings, ...lightRooms] : readings;
 
   const freshest = readings?.reduce(
     (acc, r) => (r.ageSec != null && (acc == null || r.ageSec < acc) ? r.ageSec : acc),
@@ -188,7 +215,7 @@ export default function App() {
                 <h2>Floor plan</h2>
                 <OfflineNote count={offline} />
               </div>
-              <FloorPlan plan={plan} readings={readings} onOpen={setSelected} />
+              <FloorPlan plan={plan} readings={planItems} onOpen={setSelected} />
             </>
           )}
 
@@ -200,6 +227,25 @@ export default function App() {
               <div className="grid door-grid">
                 {doors.map((r) => (
                   <DoorCard key={r.id} reading={r} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {lights && lights.length > 0 && (
+            <>
+              <div className="section-head">
+                <h2>Lights</h2>
+                {lightsError && (
+                  <span className="card-note">
+                    <span className="dot bad" aria-hidden="true" />
+                    Hue Bridge unreachable
+                  </span>
+                )}
+              </div>
+              <div className={`grid${lightsError ? ' is-stale-group' : ''}`}>
+                {lights.map((room) => (
+                  <LightCard key={room.id} room={room} />
                 ))}
               </div>
             </>

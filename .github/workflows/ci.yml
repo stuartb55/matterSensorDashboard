@@ -63,6 +63,9 @@ jobs:
           curl -sf http://127.0.0.1:8090/api/floorplan | grep -q '"source":"example"'
           curl -sf http://127.0.0.1:8090/api/floorplan | grep -q '"rooms":\[{'
 
+          echo "Hue lights are off when no bridge is configured"
+          curl -sf http://127.0.0.1:8090/api/lights | grep -q '"enabled":false'
+
           echo "unknown API paths 404 instead of falling back to the shell"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/api/nope)" = 404
 

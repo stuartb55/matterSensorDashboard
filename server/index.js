@@ -8,6 +8,7 @@ import { influxUrl, InfluxError } from './influx.js';
 import { fetchLatest, fetchHistory, probeUpstream, RANGES, DEFAULT_RANGE } from './queries.js';
 import { publicRegistry } from './sensors.js';
 import { floorplan } from './floorplan.js';
+import { fetchLights, HueError } from './hue.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -67,6 +68,37 @@ app.get('/api/floorplan', async (_req, reply) => {
   } catch (err) {
     app.log.error({ err: err.message }, 'floor plan config unreadable');
     return reply.code(500).send({ error: 'bad_floorplan', message: err.message });
+  }
+});
+
+// Same reasoning as the latest-readings cache: every open tab polls, and the
+// bridge is a small embedded device that rate-limits busy clients.
+const LIGHTS_TTL_MS = 10_000;
+let lightsCache = { at: 0, data: null, inflight: null };
+
+async function cachedLights() {
+  if (lightsCache.data && Date.now() - lightsCache.at < LIGHTS_TTL_MS) return lightsCache.data;
+  if (!lightsCache.inflight) {
+    lightsCache.inflight = fetchLights()
+      .then((data) => {
+        lightsCache = { at: Date.now(), data, inflight: null };
+        return data;
+      })
+      .catch((err) => {
+        lightsCache.inflight = null;
+        throw err;
+      });
+  }
+  return lightsCache.inflight;
+}
+
+app.get('/api/lights', async (_req, reply) => {
+  try {
+    return { ...(await cachedLights()), fetchedAt: Date.now() };
+  } catch (err) {
+    app.log.error({ err: err.message }, 'hue bridge request failed');
+    const status = err instanceof HueError ? err.status : 500;
+    return reply.code(status).send({ error: 'hue_unavailable', message: err.message });
   }
 });
 
