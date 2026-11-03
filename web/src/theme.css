@@ -771,7 +771,8 @@ tbody tr:last-child td {
 button.marker:active {
   background: var(--ghost);
 }
-.marker.is-stale {
+/* Dim the content, not the pill, so the plan never shows through the text. */
+.marker.is-stale > * {
   opacity: 0.62;
 }
 .marker.is-draggable {
