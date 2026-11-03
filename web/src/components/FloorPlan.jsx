@@ -5,6 +5,11 @@ import PlanDrawing from './PlanDrawing.jsx';
 
 const DRAFT_KEY = 'floorplan-draft';
 
+// The widest floor never draws narrower than this, so sensor cards have room
+// on a phone; the plan scrolls sideways instead of squashing them together.
+const PLAN_MIN_PX = 640;
+const PLAN_MAX_PX = 900;
+
 // Unsaved edits survive a reload. Browser storage can be missing or throw
 // (private windows, blocked site data), so every access is guarded.
 function readDraft() {
@@ -65,6 +70,16 @@ export default function FloorPlan({ plan, readings, onOpen }) {
   useEffect(() => writeDraft(dirty ? positions : null), [positions, dirty]);
 
   const floor = plan.floors.find((f) => f.id === floorId) ?? plan.floors[0];
+  // Every floor is drawn at the same scale: the widest floor fills the panel
+  // and the others take their share of it, so a room is the same size on any
+  // floor and walls and labels match.
+  const widest = Math.max(...plan.floors.map((f) => f.width));
+  const share = floor.width / widest;
+  const sizing = {
+    width: `${share * 100}%`,
+    minWidth: `${Math.round(PLAN_MIN_PX * share)}px`,
+    maxWidth: `${Math.round(PLAN_MAX_PX * share)}px`,
+  };
   const byId = useMemo(() => new Map((readings ?? []).map((r) => [r.id, r])), [readings]);
   const here = positions[floor.id] ?? {};
   const placedAnywhere = new Set(Object.values(positions).flatMap((m) => Object.keys(m)));
@@ -229,95 +244,98 @@ export default function FloorPlan({ plan, readings, onOpen }) {
         </div>
       )}
 
-      <div
-        ref={surface}
-        className={`floorplan-surface${editing ? ' is-editing' : ''}${placing ? ' is-placing' : ''}`}
-        onClick={onSurfaceClick}
-      >
-        <PlanDrawing floor={floor} />
-        {Object.entries(here).map(([id, pos]) => {
-          const r = byId.get(id);
-          if (!r) return null;
-          const { value, spoken } = describe(r);
-          const doorClass =
-            r.kind === 'door'
-              ? r.closed == null
-                ? ' is-unknown'
-                : r.closed
-                  ? ' is-closed'
-                  : ' is-open'
-              : '';
-          // The anchor slides across the marker with its position, so a sensor
-          // placed against an outside wall stays fully on the plan.
-          const fx = pos.x / floor.width;
-          const fy = pos.y / floor.height;
-          const style = {
-            left: `${fx * 100}%`,
-            top: `${fy * 100}%`,
-            transform: `translate(${-fx * 100}%, ${-fy * 100}%)`,
-          };
-          const status = r.stale ? `, offline, last seen ${fmtAge(r.ageSec)}` : '';
-          const body = (
-            <>
-              <span className="marker-label">
-                <span
-                  className={`marker-key${r.kind === 'door' ? ` door-indicator${doorClass}` : ''}`}
-                  style={r.kind === 'door' ? undefined : { background: seriesVar(id) }}
-                  aria-hidden="true"
-                />
-                {r.label}
-              </span>
-              <span className="marker-value">{r.stale ? fmtAge(r.ageSec) : value}</span>
-            </>
-          );
-          const className = `marker${r.stale ? ' is-stale' : ''}${doorClass}`;
+      <div className="floorplan-scroll">
+        <div
+          ref={surface}
+          className={`floorplan-surface${editing ? ' is-editing' : ''}${placing ? ' is-placing' : ''}`}
+          style={sizing}
+          onClick={onSurfaceClick}
+        >
+          <PlanDrawing floor={floor} unit={widest / 100} />
+          {Object.entries(here).map(([id, pos]) => {
+            const r = byId.get(id);
+            if (!r) return null;
+            const { value, spoken } = describe(r);
+            const doorClass =
+              r.kind === 'door'
+                ? r.closed == null
+                  ? ' is-unknown'
+                  : r.closed
+                    ? ' is-closed'
+                    : ' is-open'
+                : '';
+            // The anchor slides across the marker with its position, so a sensor
+            // placed against an outside wall stays fully on the plan.
+            const fx = pos.x / floor.width;
+            const fy = pos.y / floor.height;
+            const style = {
+              left: `${fx * 100}%`,
+              top: `${fy * 100}%`,
+              transform: `translate(${-fx * 100}%, ${-fy * 100}%)`,
+            };
+            const status = r.stale ? `, offline, last seen ${fmtAge(r.ageSec)}` : '';
+            const body = (
+              <>
+                <span className="marker-label">
+                  <span
+                    className={`marker-key${r.kind === 'door' ? ` door-indicator${doorClass}` : ''}`}
+                    style={r.kind === 'door' ? undefined : { background: seriesVar(id) }}
+                    aria-hidden="true"
+                  />
+                  {r.label}
+                </span>
+                <span className="marker-value">{r.stale ? fmtAge(r.ageSec) : value}</span>
+              </>
+            );
+            const className = `marker${r.stale ? ' is-stale' : ''}${doorClass}`;
 
-          if (editing) {
+            if (editing) {
+              return (
+                <div
+                  key={id}
+                  className={`${className} is-draggable`}
+                  style={style}
+                  onPointerDown={onMarkerDown(id)}
+                  onPointerMove={onMarkerMove(id)}
+                  onPointerUp={onMarkerUp}
+                  onPointerCancel={onMarkerUp}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {body}
+                  <button
+                    type="button"
+                    className="marker-remove"
+                    aria-label={`Remove ${r.label} from the plan`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => remove(id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            }
+            // Doors have no history chart, so they have nothing to open.
+            if (r.kind === 'door') {
+              return (
+                <div key={id} className={className} style={style} aria-label={`${r.label}: ${spoken}${status}`}>
+                  {body}
+                </div>
+              );
+            }
             return (
-              <div
+              <button
                 key={id}
-                className={`${className} is-draggable`}
+                type="button"
+                className={className}
                 style={style}
-                onPointerDown={onMarkerDown(id)}
-                onPointerMove={onMarkerMove(id)}
-                onPointerUp={onMarkerUp}
-                onPointerCancel={onMarkerUp}
-                onClick={(e) => e.stopPropagation()}
+                onClick={() => onOpen(id)}
+                aria-label={`${r.label}, ${spoken}${status}. Open detail.`}
               >
                 {body}
-                <button
-                  type="button"
-                  className="marker-remove"
-                  aria-label={`Remove ${r.label} from the plan`}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => remove(id)}
-                >
-                  ×
-                </button>
-              </div>
+              </button>
             );
-          }
-          // Doors have no history chart, so they have nothing to open.
-          if (r.kind === 'door') {
-            return (
-              <div key={id} className={className} style={style} aria-label={`${r.label}: ${spoken}${status}`}>
-                {body}
-              </div>
-            );
-          }
-          return (
-            <button
-              key={id}
-              type="button"
-              className={className}
-              style={style}
-              onClick={() => onOpen(id)}
-              aria-label={`${r.label}, ${spoken}${status}. Open detail.`}
-            >
-              {body}
-            </button>
-          );
-        })}
+          })}
+        </div>
       </div>
     </section>
   );

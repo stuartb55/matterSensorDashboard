@@ -38,12 +38,13 @@ function Stairs({ rect: [x, y, w, h], steps, along }) {
   );
 }
 
-export default function PlanDrawing({ floor }) {
+export default function PlanDrawing({ floor, unit: sharedUnit }) {
   // Wall thickness and type size scale with the drawing, so a layout in
-  // centimetres and one in pixels both read the same. The view box is exactly
+  // centimetres and one in pixels both read the same. The parent passes one
+  // unit for every floor so walls and labels match between them. The view box is exactly
   // the floor, so marker positions map straight onto it; leave a margin round
   // the outside walls in the layout itself.
-  const unit = Math.max(floor.width, floor.height) / 100;
+  const unit = sharedUnit ?? floor.width / 100;
   const wall = unit * 0.9;
 
   return (
