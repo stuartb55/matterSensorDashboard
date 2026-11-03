@@ -32,6 +32,12 @@ services:
       PORT: "8090"
       NODE_ENV: production
 
+    # Your floor plan: an image per floor plus floorplan.json with the sensor
+    # positions. It identifies the house, so it lives only on the host and is
+    # gitignored. Without it the generic example plan is shown.
+    volumes:
+      - ./floorplan:/app/floorplan:ro
+
     networks:
       - influxdb
 

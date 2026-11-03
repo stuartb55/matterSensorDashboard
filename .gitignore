@@ -4,3 +4,6 @@ web/dist/
 *.log
 .DS_Store
 ._*
+
+# Real floor plan: identifies the house, so it stays on the host only.
+/floorplan/

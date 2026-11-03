@@ -70,6 +70,66 @@ npm run dev:server     # API on :8090, serves web/dist if built
 npm run dev:web        # Vite dev server on :5174, proxies /api to :8090
 ```
 
+## Floor plan
+
+The Floor plan section draws each floor of the house and pins every sensor's
+live reading where it is. Tap a sensor to open its detail sheet.
+
+The plan is drawn in the browser as SVG from a JSON layout of rooms, doors,
+windows and stairs, so changing a colour or adding a room is an edit to that
+file, not a new image. Colours come from the theme (`--plan-room`,
+`--plan-wall`, `--plan-window` and friends in `web/src/theme.css`), so the plan
+follows light and dark mode, and any room can take its own `fill`.
+
+A layout of the house identifies it, so the real one never goes in this
+repository. The server reads `floorplan.json` from a `floorplan/` folder next to
+`docker-compose.yml` (gitignored, mounted read-only at `/app/floorplan`; set
+`FLOORPLAN_DIR` to read it from elsewhere when running without Docker). Until
+that file exists, the generic example in `server/floorplan-example/` is shown,
+which is also the best starting point for your own.
+
+```json
+{
+  "floors": [
+    {
+      "id": "ground",
+      "label": "Ground floor",
+      "width": 800,
+      "height": 500,
+      "rooms": [
+        { "name": "Kitchen", "rect": [400, 20, 380, 280] },
+        { "name": "Garage", "rect": [440, 300, 340, 180], "fill": "var(--plan-outbuilding)" },
+        { "name": "Bay room", "points": [[20, 60], [60, 20], [360, 20], [400, 60], [400, 300], [20, 300]] }
+      ],
+      "doors": [{ "from": [780, 40], "to": [780, 100] }],
+      "windows": [{ "from": [480, 20], "to": [700, 20] }],
+      "stairs": [{ "rect": [180, 400, 110, 70], "steps": 8, "along": "x" }],
+      "markers": { "kitchen": { "x": 580, "y": 150 } }
+    }
+  ]
+}
+```
+
+- Units are whatever you like (pixels, centimetres): `width` and `height` set
+  the drawing's size and everything else is in the same units, with `0, 0` at
+  the top left. Leave a margin round the outside walls.
+- A room is a `rect` (`[x, y, width, height]`) or a polygon of `points`. Its
+  `name` is centred unless `label: [x, y]` places it; `labelSize` scales it for
+  small rooms. Rooms are drawn in order, so a cupboard listed after the landing
+  sits on top of it. `fill` takes a hex colour, a colour name or `var(--token)`.
+- Doors are gaps cut into a wall and windows are panes drawn over it, each a
+  segment from `from` to `to` along the wall. `barriers` are low walls,
+  banisters and other half-height partitions, drawn thinner than a wall, in the
+  same `from`/`to` form.
+- `markers` maps sensor ids from `server/sensors.js` to where they sit; unknown
+  ids are ignored. The easiest way to set them is **Edit positions** in the
+  dashboard: drag each sensor into place (tap one in the list, then the plan, to
+  add one that isn't placed), then **Copy floorplan.json** or **Download** and
+  replace the file. Unsaved edits stay in the browser until exported or
+  discarded; the server never writes the file itself.
+
+The file is re-read on every page load, so no restart is needed.
+
 ## CI and dependencies
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
@@ -97,6 +157,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/sensors` | Sensor registry |
 | `GET /api/readings/latest` | Current reading per sensor, 10s server-side cache |
 | `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
+| `GET /api/floorplan` | Floor layouts and sensor positions |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`. No SQL reaches the
 backend from the browser.

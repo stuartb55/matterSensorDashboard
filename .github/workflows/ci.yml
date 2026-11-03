@@ -59,6 +59,10 @@ jobs:
           echo "unreachable upstream reports unhealthy, not dead"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/health)" = 503
 
+          echo "floor plan falls back to the example layout"
+          curl -sf http://127.0.0.1:8090/api/floorplan | grep -q '"source":"example"'
+          curl -sf http://127.0.0.1:8090/api/floorplan | grep -q '"rooms":\[{'
+
           echo "unknown API paths 404 instead of falling back to the shell"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/api/nope)" = 404
 

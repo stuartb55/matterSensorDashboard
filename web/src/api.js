@@ -30,3 +30,5 @@ export const RANGES = [
   { key: '7d', label: '7D' },
   { key: '30d', label: '30D' },
 ];
+
+export const getFloorplan = (signal) => getJson('/api/floorplan', signal);
