@@ -33,6 +33,9 @@ export default function App() {
   // Hue rooms, or null until the bridge first answers (or when it isn't set up).
   const [lights, setLights] = useState(null);
   const [lightsError, setLightsError] = useState(null);
+  // True once the server has said the bridge is configured but not answering.
+  // Lets the section appear with a notice even before any lights have loaded.
+  const [lightsDown, setLightsDown] = useState(false);
 
   // Keyed by range so a stale in-flight response can't overwrite a newer one.
   const historyRange = useRef(range);
@@ -45,8 +48,14 @@ export default function App() {
       const data = await getLights(signal);
       setLights(data.enabled ? data.rooms : null);
       setLightsError(null);
+      setLightsDown(false);
     } catch (err) {
-      if (err.name !== 'AbortError') setLightsError(err.message);
+      if (err.name === 'AbortError') return;
+      setLightsError(err.message);
+      // Only the server's own "bridge unavailable" answer means Hue is set up.
+      // A network failure says nothing about Hue, and the sensor banner
+      // already covers it.
+      if (err.code === 'hue_unavailable') setLightsDown(true);
     }
   }, []);
 
@@ -232,7 +241,7 @@ export default function App() {
             </>
           )}
 
-          {lights && lights.length > 0 && (
+          {((lights && lights.length > 0) || (lightsError && lightsDown)) && (
             <>
               <div className="section-head">
                 <h2>Lights</h2>
@@ -243,11 +252,20 @@ export default function App() {
                   </span>
                 )}
               </div>
-              <div className={`grid${lightsError ? ' is-stale-group' : ''}`}>
-                {lights.map((room) => (
-                  <LightCard key={room.id} room={room} />
-                ))}
-              </div>
+              {lights?.length > 0 ? (
+                <div className={`grid${lightsError ? ' is-stale-group' : ''}`}>
+                  {lights.map((room) => (
+                    <LightCard key={room.id} room={room} />
+                  ))}
+                </div>
+              ) : (
+                <div className="notice error" role="status">
+                  <span>
+                    No light states yet.{' '}
+                    <span style={{ color: 'var(--text-muted)' }}>{lightsError}</span>
+                  </span>
+                </div>
+              )}
             </>
           )}
 

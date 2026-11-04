@@ -2,13 +2,17 @@ async function getJson(path, signal) {
   const res = await fetch(path, { signal, headers: { Accept: 'application/json' } });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
+    let code;
     try {
       const body = await res.json();
       if (body?.message) detail = body.message;
+      code = body?.error;
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(detail);
+    // The server's error code travels with the message, so a caller can tell
+    // "this upstream is down" from "the dashboard itself is unreachable".
+    throw Object.assign(new Error(detail), { code });
   }
   return res.json();
 }
