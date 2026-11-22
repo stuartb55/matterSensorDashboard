@@ -48,3 +48,13 @@ test('spansDays tells hour ranges from day ranges', () => {
   assert.equal(spansDays('7d'), true);
   assert.equal(spansDays('1y'), true);
 });
+
+test('dew point and absolute humidity match reference values', async () => {
+  const { absoluteHumidity, dewPoint, dewPointSeries } = await import('../web/src/format.js');
+  // 20 °C at 50% RH: dew point 9.3 °C, 8.6 g/m3.
+  assert.ok(Math.abs(dewPoint(20, 50) - 9.26) < 0.05);
+  assert.ok(Math.abs(absoluteHumidity(20, 50) - 8.63) < 0.05);
+  // Saturated air condenses at its own temperature.
+  assert.ok(Math.abs(dewPoint(15, 100) - 15) < 1e-9);
+  assert.deepEqual(dewPointSeries([20, null], [50, 40]).map((v) => v && Math.round(v)), [9, null]);
+});

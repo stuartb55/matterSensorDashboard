@@ -16,6 +16,10 @@ import {
   fmtDuration,
   summarise,
   timeAtOrAbove,
+  absoluteHumidity,
+  dewPoint,
+  dewPointSeries,
+  DAMP_RH,
 } from '../format.js';
 
 // Above about 1,000 ppm a room is due some fresh air; it is the level most
@@ -88,6 +92,46 @@ function Co2History({ reading, series, drawn, t, bucketSec, range, rangeLabel, c
   );
 }
 
+/**
+ * Dew point and damp, derived from the raw temperature and humidity of each
+ * bucket. Dew point is the surface temperature at which condensation forms,
+ * so a cold window or outside wall near it is where mould starts.
+ */
+function Comfort({ reading, series, t, bucketSec, range, rangeLabel, color }) {
+  const dew = useMemo(() => dewPointSeries(series.temp, series.hum), [series]);
+  // Bridged like the other lines, for drawing only.
+  const drawnDew = useMemo(() => bridgeGaps(dew, bucketSec, series.bridgeSec), [dew, bucketSec, series]);
+  const damp = timeAtOrAbove(series.hum, DAMP_RH, bucketSec);
+  const dewNow = dewPoint(reading.tempC, reading.humidity);
+  const absNow = absoluteHumidity(reading.tempC, reading.humidity);
+  return (
+    <section className="panel">
+      <h3 className="panel-title">Dew point</h3>
+      <p className="panel-sub">
+        Surfaces colder than this collect condensation.
+        {dewNow != null &&
+          ` Now ${dewNow.toFixed(1)}°C, with ${absNow.toFixed(1)} g of water in each cubic metre of air.`}
+      </p>
+      <TimeChart
+        t={t}
+        range={range}
+        unit="°C"
+        height={160}
+        ariaLabel={`Dew point for ${reading.label} over ${rangeLabel}`}
+        series={[{ label: 'Dew point', values: drawnDew, color }]}
+      />
+      <Stats values={dew} unit="°C" />
+      {damp != null && (
+        <p className={`panel-sub damp-note${damp > 0 ? ' is-damp' : ''}`}>
+          {damp > 0
+            ? `At or above ${DAMP_RH}% humidity for about ${fmtDuration(damp)} of ${rangeLabel}. Damp that lasts for hours lets mould take hold, so air the room or run an extractor.`
+            : `Never reached ${DAMP_RH}% humidity over ${rangeLabel}, the level where lasting damp starts to risk mould.`}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function ClimateHistory(props) {
   const { reading, series, drawn, t, range, rangeLabel, color } = props;
   return (
@@ -124,6 +168,8 @@ function ClimateHistory(props) {
         />
         <Stats values={series.hum} unit="%" digits={0} />
       </section>
+
+      {reading.kind === 'room' && <Comfort {...props} />}
 
       {series.co2?.some((v) => v != null) && <Co2History {...props} />}
     </>
@@ -296,6 +342,9 @@ export default function DetailSheet({
                       : [
                           { label: 'Temp °C', values: series.temp },
                           { label: 'Humidity %', values: series.hum, digits: 0 },
+                          ...(reading.kind === 'room'
+                            ? [{ label: 'Dew point °C', values: dewPointSeries(series.temp, series.hum) }]
+                            : []),
                           ...(series.co2 ? [{ label: 'CO₂ ppm', values: series.co2, digits: 0 }] : []),
                         ]
                   }

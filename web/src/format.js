@@ -191,7 +191,9 @@ export function timeAtOrAbove(values, level, bucketSec) {
     seen = true;
     if (v >= level) n += 1;
   }
-  return seen ? n * bucketSec : null;
+  // The axis has one more bucket than the span holds (both ends are
+  // included), so a level held throughout must not read as longer than it.
+  return seen ? Math.min(n, values.length - 1) * bucketSec : null;
 }
 
 /** "3h 20m", "45m", "0m". */
@@ -204,3 +206,32 @@ export function fmtDuration(sec) {
   const d = Math.floor(h / 24);
   return h % 24 ? `${d}d ${h % 24}h` : `${d}d`;
 }
+
+/**
+ * Dew point in °C from temperature (°C) and relative humidity (%), by the
+ * Magnus formula (Sonntag 1990 constants), good to about 0.1 °C indoors.
+ * The temperature at which a surface starts collecting condensation.
+ */
+export function dewPoint(tempC, rh) {
+  if (tempC == null || rh == null || rh <= 0) return null;
+  const a = 17.62;
+  const b = 243.12;
+  const g = Math.log(Math.min(rh, 100) / 100) + (a * tempC) / (b + tempC);
+  return (b * g) / (a - g);
+}
+
+/** Water vapour actually in the air, in grams per cubic metre. */
+export function absoluteHumidity(tempC, rh) {
+  if (tempC == null || rh == null) return null;
+  const saturation = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5)); // hPa
+  return (saturation * rh * 2.1674) / (273.15 + tempC);
+}
+
+/**
+ * Relative humidity at which mould can take hold if it lasts. Most building
+ * guidance puts the line at 70% sustained over hours, not a passing shower.
+ */
+export const DAMP_RH = 70;
+
+/** Element-wise dew point over two aligned series, null where either is. */
+export const dewPointSeries = (temp, hum) => temp.map((t, i) => dewPoint(t, hum[i]));

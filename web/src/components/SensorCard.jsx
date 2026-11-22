@@ -10,6 +10,7 @@ import {
   fmtTemp,
   batteryLow,
   trend,
+  DAMP_RH,
 } from '../format.js';
 
 /**
@@ -21,6 +22,7 @@ export default function SensorCard({ reading, history, bucketSec, rangeLabel, on
   // Trend uses the raw series — never the bridged copy.
   const delta = history ? trend(history.temp) : null;
   const lowBattery = batteryLow(battery, batteryKind);
+  const damp = reading.kind === 'room' && humidity != null && humidity >= DAMP_RH;
 
   const sparkValues = useMemo(
     () => (history ? bridgeGaps(history.temp, bucketSec, history.bridgeSec) : null),
@@ -42,6 +44,8 @@ export default function SensorCard({ reading, history, bucketSec, rangeLabel, on
       className={`card${stale ? ' is-stale' : ''}`}
       onClick={() => onOpen(id)}
       aria-label={`${label}, ${fmtTemp(tempC)} degrees, ${fmtHum(humidity)} percent humidity${
+        damp ? ', damp' : ''
+      }${
         hasCo2 ? `, ${fmtCo2(co2)} parts per million CO2` : ''
       }. Open detail.`}
     >
@@ -57,6 +61,11 @@ export default function SensorCard({ reading, history, bucketSec, rangeLabel, on
           <span className="card-note" title="Battery low">
             <span className="dot warn" aria-hidden="true" />
             {fmtBattery(battery, batteryKind)}
+          </span>
+        ) : damp ? (
+          <span className="card-note" title={`Humidity at or above ${DAMP_RH}%`}>
+            <span className="dot warn" aria-hidden="true" />
+            Damp
           </span>
         ) : null}
       </div>
