@@ -41,6 +41,21 @@ function FeedNotice({ feeds }) {
   );
 }
 
+/** Warmest and coolest room right now, among those reporting. */
+function RoomsSummary({ rooms }) {
+  const live = rooms.filter((r) => !r.stale && r.tempC != null);
+  if (live.length < 2) return null;
+  const sorted = [...live].sort((a, b) => b.tempC - a.tempC);
+  const warm = sorted[0];
+  const cool = sorted.at(-1);
+  return (
+    <p className="rooms-summary">
+      Warmest {warm.label} {fmtTemp(warm.tempC)}°, coolest {cool.label} {fmtTemp(cool.tempC)}°, a
+      spread of {(warm.tempC - cool.tempC).toFixed(1)}°.
+    </p>
+  );
+}
+
 function OfflineNote({ count }) {
   if (!count) return null;
   return (
@@ -357,6 +372,7 @@ export default function App() {
             <h2>Rooms</h2>
             <OfflineNote count={roomsOffline} />
           </div>
+          <RoomsSummary rooms={rooms} />
           <div className="grid">
             {rooms.map((r) => (
               <SensorCard

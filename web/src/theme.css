@@ -1193,3 +1193,29 @@ button.door-card:active {
   color: var(--text-secondary);
   margin-top: 2px;
 }
+.daily-range-plot {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+}
+.daily-range-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 0;
+}
+.daily-grid {
+  stroke: var(--gridline);
+  vector-effect: non-scaling-stroke;
+}
+.rooms-summary {
+  margin: -4px 2px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.stats.stats-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
