@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { seriesVar } from '../palette.js';
 import { fmtAge, fmtHum, fmtPower, fmtTemp } from '../format.js';
-import PlanDrawing from './PlanDrawing.jsx';
+import PlanDrawing, { roomPoints } from './PlanDrawing.jsx';
+import { binLabels, binOf, MEASURES, rampStep, roomValues } from '../heat.js';
 import { lightsSummary } from './LightCard.jsx';
 
 const DRAFT_KEY = 'floorplan-draft';
+const SHADE_KEY = 'floorplan-shade';
 
 // The widest floor never draws narrower than this, so sensor cards have room
 // on a phone; the plan scrolls sideways instead of squashing them together.
@@ -28,6 +30,49 @@ function writeDraft(value) {
   } catch {
     /* storage unavailable: the draft just won't outlive the tab */
   }
+}
+
+function readShade() {
+  try {
+    const v = localStorage.getItem(SHADE_KEY);
+    return v && MEASURES[v] ? v : 'off';
+  } catch {
+    return 'off';
+  }
+}
+function writeShade(value) {
+  try {
+    localStorage.setItem(SHADE_KEY, value);
+  } catch {
+    /* storage unavailable: the choice lasts for this visit only */
+  }
+}
+
+/** Fixed-bin legend for the shaded measure, plus the plain "no reading" swatch. */
+function HeatLegend({ measure }) {
+  const m = MEASURES[measure];
+  const labels = binLabels(m.edges);
+  return (
+    <div className="heat-legend" aria-label={`${m.label} shading key`}>
+      <ul>
+        {labels.map((label, i) => (
+          <li key={label}>
+            <span
+              className="heat-swatch"
+              style={{ background: `var(--heat-${rampStep(i, labels.length)})` }}
+              aria-hidden="true"
+            />
+            {label}
+            {i === labels.length - 1 ? m.unit : ''}
+          </li>
+        ))}
+        <li>
+          <span className="heat-swatch is-none" aria-hidden="true" />
+          No live reading
+        </li>
+      </ul>
+    </div>
+  );
 }
 
 const markersOf = (floors) => Object.fromEntries(floors.map((f) => [f.id, { ...f.markers }]));
@@ -66,6 +111,8 @@ export default function FloorPlan({ plan, readings, onOpen }) {
   const [editing, setEditing] = useState(false);
   const [placing, setPlacing] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [shade, setShade] = useState(readShade);
+  useEffect(() => writeShade(shade), [shade]);
   const [positions, setPositions] = useState(() => readDraft() ?? markersOf(plan.floors));
   const surface = useRef(null);
   const drag = useRef(null);
@@ -89,6 +136,20 @@ export default function FloorPlan({ plan, readings, onOpen }) {
   const here = positions[floor.id] ?? {};
   const placedAnywhere = new Set(Object.values(positions).flatMap((m) => Object.keys(m)));
   const unplaced = (readings ?? []).filter((r) => !placedAnywhere.has(r.id));
+
+  // CO2 is offered only when a CO2 sensor is actually on the plan.
+  const shadeOptions = Object.keys(MEASURES).filter(
+    (k) => k !== 'co2' || [...placedAnywhere].some((id) => byId.get(id)?.hasCo2),
+  );
+  const measure = shadeOptions.includes(shade) ? shade : 'off';
+  const fills = useMemo(() => {
+    if (measure === 'off' || editing) return null;
+    const m = MEASURES[measure];
+    const bins = m.edges.length + 1;
+    return roomValues(floor.rooms.map(roomPoints), here, byId, m.field).map((v) =>
+      v == null ? null : `var(--heat-${rampStep(binOf(v, m.edges), bins)})`,
+    );
+  }, [measure, editing, floor, here, byId]);
 
   // Pointer position in the floor's own layout units, clamped onto the floor.
   const pointToPlan = (e) => {
@@ -198,6 +259,24 @@ export default function FloorPlan({ plan, readings, onOpen }) {
         </button>
       </div>
 
+      {!editing && (
+        <div className="chip-row shade-row" role="group" aria-label="Shade rooms by">
+          <span className="shade-label">Shade</span>
+          {['off', ...shadeOptions].map((k) => (
+            <button
+              key={k}
+              type="button"
+              className="chip"
+              aria-pressed={measure === k}
+              onClick={() => setShade(k)}
+            >
+              {k === 'off' ? 'Off' : MEASURES[k].label}
+            </button>
+          ))}
+        </div>
+      )}
+      {fills && <HeatLegend measure={measure} />}
+
       {plan.source === 'example' && (
         <p className="panel-sub">
           This is the example plan. Put your own <code>floorplan.json</code> in the server’s{' '}
@@ -256,7 +335,7 @@ export default function FloorPlan({ plan, readings, onOpen }) {
           style={sizing}
           onClick={onSurfaceClick}
         >
-          <PlanDrawing floor={floor} unit={widest / 100} />
+          <PlanDrawing floor={floor} unit={widest / 100} fills={fills} />
           {Object.entries(here).map(([id, pos]) => {
             const r = byId.get(id);
             if (!r) return null;
@@ -328,8 +407,8 @@ export default function FloorPlan({ plan, readings, onOpen }) {
                 </div>
               );
             }
-            // Doors and lights have no history chart, so they have nothing to open.
-            if (r.kind === 'door' || r.kind === 'lights') {
+            // Lights have no history, so they have nothing to open.
+            if (r.kind === 'lights') {
               return (
                 <div key={id} className={className} style={style} aria-label={`${r.label}: ${spoken}${status}`}>
                   {body}

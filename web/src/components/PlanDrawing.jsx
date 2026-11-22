@@ -38,7 +38,11 @@ function Stairs({ rect: [x, y, w, h], steps, along }) {
   );
 }
 
-export default function PlanDrawing({ floor, unit: sharedUnit }) {
+/**
+ * `fills` optionally shades rooms (one CSS colour or null per room, in layout
+ * order); labels then get a halo so they stay legible on a dark shade.
+ */
+export default function PlanDrawing({ floor, unit: sharedUnit, fills = null }) {
   // Wall thickness and type size scale with the drawing, so a layout in
   // centimetres and one in pixels both read the same. The parent passes one
   // unit for every floor so walls and labels match between them. The view box is exactly
@@ -59,7 +63,7 @@ export default function PlanDrawing({ floor, unit: sharedUnit }) {
           <polygon
             key={i}
             points={roomPoints(room).join(' ')}
-            style={room.fill ? { fill: room.fill } : undefined}
+            style={fills?.[i] ? { fill: fills[i] } : room.fill ? { fill: room.fill } : undefined}
           />
         ))}
       </g>
@@ -91,7 +95,11 @@ export default function PlanDrawing({ floor, unit: sharedUnit }) {
         ))}
       </g>
 
-      <g className="plan-labels" fontSize={unit * 2.4}>
+      <g
+        className={`plan-labels${fills ? ' has-halo' : ''}`}
+        fontSize={unit * 2.4}
+        strokeWidth={fills ? unit * 0.6 : undefined}
+      >
         {floor.rooms.map((room, i) => {
           if (!room.name) return null;
           const [x, y] = labelAt(room, roomPoints(room));
