@@ -19,6 +19,7 @@ import {
 } from './queries.js';
 import { publicRegistry, SENSORS, SENSORS_FROM } from './sensors.js';
 import { floorplan } from './floorplan.js';
+import { cacheLongHistory } from './history-cache.js';
 import { fetchLights, HueError } from './hue.js';
 import { fetchWeather, WeatherError } from './weather.js';
 import { fetchLightHistory, lightHistoryEnabled, startRecorder } from './hue-history.js';
@@ -166,6 +167,8 @@ app.get('/api/readings/latest', async (_req, reply) => {
   }
 });
 
+const cachedHistory = cacheLongHistory(fetchHistory);
+
 app.get('/api/history', async (req, reply) => {
   const range = String(req.query.range || DEFAULT_RANGE);
   if (!isPublicRange(range)) {
@@ -181,7 +184,7 @@ app.get('/api/history', async (req, reply) => {
     return reply.code(400).send({ error: 'bad_end', message: err.message });
   }
   try {
-    return await fetchHistory(range, ids, end);
+    return await cachedHistory(range, ids, end);
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }
