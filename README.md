@@ -99,6 +99,34 @@ the same reading is always the same shade. Rooms are matched to sensors by
 marker position, so no extra configuration is needed; a room with no live
 sensor stays plain.
 
+## Sensor list
+
+The built-in sensor list lives in `server/sensors.js`. To change it without a
+rebuild, put a `sensors.json` in a `config/` folder next to
+`docker-compose.yml` (gitignored, mounted read-only at `/app/config`; set
+`CONFIG_DIR` when running without Docker) and restart the container. It
+replaces the built-in list entirely:
+
+```json
+{
+  "sensors": [
+    { "id": "living_room", "label": "Living Room", "kind": "room", "source": "ruuvi", "key": "LivingRoom" },
+    { "id": "loft", "label": "Loft", "kind": "room", "source": "matter", "key": "Loft", "slot": 3 },
+    { "id": "hot_water", "label": "Hot Water", "kind": "equipment", "source": "ruuvi", "key": "HotWater",
+      "heating": { "minRiseC": 2, "hotC": 45 } }
+  ]
+}
+```
+
+- `kind` is `room`, `equipment`, `door` or `power`; `source` is `ruuvi` or
+  `matter`; `key` is the sensor's tag value upstream (`name` for Ruuvi, `node`
+  for Matter).
+- Optional: `noBattery`, `hasCo2` (Ruuvi only), `staleAfterSec`, `heating`, and
+  `slot` (1–8), the colour slot for a sensor the built-in palette doesn't know.
+- A file that fails validation stops the server with every problem listed in
+  the log, rather than showing the wrong house. `/api/sensors` reports
+  `sensorsFrom: "file"` or `"builtin"`.
+
 ## Hue lights
 
 Philips Hue lights are read live from the Hue Bridge's local API and shown

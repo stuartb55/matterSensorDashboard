@@ -4,6 +4,10 @@
 // cadences. Everything downstream reads from here, so adding a sensor is a
 // one-line change and the rest of the app never sees the schema difference.
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export const SOURCES = {
   ruuvi: {
     // Shown in the feed-down banner; the only part of a source that reaches
@@ -55,7 +59,9 @@ export const SOURCES = {
   },
 };
 
-export const SENSORS = [
+// The built-in inventory. A `config/sensors.json` on the host replaces it
+// (see loadSensors below), so a new sensor needs no rebuild.
+export const DEFAULT_SENSORS = [
   { id: 'living_room', label: 'Living Room', kind: 'room', source: 'ruuvi', key: 'LivingRoom' },
   { id: 'bedroom', label: 'Bedroom', kind: 'room', source: 'ruuvi', key: 'Bedroom' },
   { id: 'office', label: 'Office', kind: 'room', source: 'ruuvi', key: 'Office' },
@@ -110,6 +116,82 @@ export const SENSORS = [
   },
 ];
 
+const KINDS = new Set(['room', 'equipment', 'door', 'power']);
+const ID_RE = /^[a-z0-9_]+$/;
+
+/**
+ * Check a sensor list from the config file and return it normalised, or throw
+ * naming every problem found. Only fields the app understands are kept, so a
+ * stray key can't reach SQL or the browser.
+ */
+export function validateSensors(list) {
+  if (!Array.isArray(list)) throw new Error('sensors.json must hold an array of sensors');
+  const problems = [];
+  const seen = new Set();
+  const out = list.map((raw, i) => {
+    const where = `sensor ${i + 1}${raw?.id ? ` (${raw.id})` : ''}`;
+    const fail = (msg) => problems.push(`${where}: ${msg}`);
+    if (!raw || typeof raw !== 'object') {
+      fail('is not an object');
+      return null;
+    }
+    const { id, label, kind, source, key } = raw;
+    if (typeof id !== 'string' || !ID_RE.test(id)) fail('id must be lowercase letters, digits and _');
+    else if (seen.has(id)) fail('id is used twice');
+    else seen.add(id);
+    if (typeof label !== 'string' || !label.trim()) fail('label is required');
+    if (!KINDS.has(kind)) fail(`kind must be one of ${[...KINDS].join(', ')}`);
+    if (!SOURCES[source]) fail(`source must be one of ${Object.keys(SOURCES).join(', ')}`);
+    if (typeof key !== 'string' || !key) fail('key (the tag value upstream) is required');
+    if (raw.hasCo2 && source !== 'ruuvi') fail('hasCo2 only applies to ruuvi sensors');
+    if (raw.slot != null && !(Number.isInteger(raw.slot) && raw.slot >= 1 && raw.slot <= 8)) {
+      fail('slot must be a whole number from 1 to 8');
+    }
+    if (raw.staleAfterSec != null && !(Number.isFinite(raw.staleAfterSec) && raw.staleAfterSec > 0)) {
+      fail('staleAfterSec must be a positive number');
+    }
+    if (raw.heating != null) {
+      const { minRiseC, hotC } = raw.heating;
+      if (!Number.isFinite(minRiseC) || !Number.isFinite(hotC)) fail('heating needs minRiseC and hotC numbers');
+    }
+    const sensor = { id, label, kind, source, key };
+    if (raw.noBattery) sensor.noBattery = true;
+    if (raw.hasCo2) sensor.hasCo2 = true;
+    if (raw.slot != null) sensor.slot = raw.slot;
+    if (raw.staleAfterSec != null) sensor.staleAfterSec = raw.staleAfterSec;
+    if (raw.heating != null) sensor.heating = { minRiseC: raw.heating.minRiseC, hotC: raw.heating.hotC };
+    return sensor;
+  });
+  if (problems.length) throw new Error(`invalid sensors.json:\n  ${problems.join('\n  ')}`);
+  return out;
+}
+
+const CONFIG_DIR = path.resolve(
+  process.env.CONFIG_DIR || path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'config'),
+);
+
+/**
+ * The sensor list in force: `sensors.json` in CONFIG_DIR when present
+ * (mounted read-only from the host, like the floor plan), else the built-in
+ * list. A file that is present but wrong stops the server with the reasons,
+ * rather than quietly showing the wrong house.
+ */
+function loadSensors() {
+  const file = path.join(CONFIG_DIR, 'sensors.json');
+  if (!fs.existsSync(file)) return { list: DEFAULT_SENSORS, from: 'builtin' };
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (err) {
+    throw new Error(`cannot read ${file}: ${err.message}`);
+  }
+  return { list: validateSensors(parsed.sensors ?? parsed), from: 'file' };
+}
+
+const loaded = loadSensors();
+export const SENSORS = loaded.list;
+export const SENSORS_FROM = loaded.from;
+
 const BY_SOURCE_KEY = new Map(SENSORS.map((s) => [`${s.source}:${s.key}`, s]));
 
 /**
@@ -127,11 +209,12 @@ export function sensorsForSource(source) {
 
 /** Public shape of the registry — no database details leak to the client. */
 export function publicRegistry() {
-  return SENSORS.map(({ id, label, kind, noBattery, source }) => ({
+  return SENSORS.map(({ id, label, kind, noBattery, source, slot }) => ({
     id,
     label,
     kind,
     hasBattery: !noBattery,
     batteryKind: SOURCES[source].battKind,
+    ...(slot ? { slot } : {}),
   }));
 }

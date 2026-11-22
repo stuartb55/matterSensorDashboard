@@ -17,7 +17,7 @@ import {
   RANGES,
   DEFAULT_RANGE,
 } from './queries.js';
-import { publicRegistry } from './sensors.js';
+import { publicRegistry, SENSORS, SENSORS_FROM } from './sensors.js';
 import { floorplan } from './floorplan.js';
 import { fetchLights, HueError } from './hue.js';
 import { fetchWeather, WeatherError } from './weather.js';
@@ -72,8 +72,13 @@ app.get('/health', async (_req, reply) => {
   }
 });
 
+app.log.info(
+  `${SENSORS.length} sensors from ${SENSORS_FROM === 'file' ? 'config/sensors.json' : 'the built-in list'}`,
+);
+
 app.get('/api/sensors', async () => ({
   sensors: publicRegistry(),
+  sensorsFrom: SENSORS_FROM,
   ranges: publicRanges(),
   defaultRange: DEFAULT_RANGE,
 }));

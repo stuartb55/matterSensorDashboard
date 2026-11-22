@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { registerSlots } from './palette.js';
 import { getFloorplan, getHistory, getLatest, getLights, getDaily, getSensors, getWeather } from './api.js';
 import { fmtAge, fmtDuration, fmtHum, fmtTemp } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
@@ -252,7 +253,10 @@ export default function App() {
   useEffect(() => {
     const ac = new AbortController();
     getSensors(ac.signal)
-      .then((data) => setRanges(data.ranges ?? []))
+      .then((data) => {
+        registerSlots(data.sensors);
+        setRanges(data.ranges ?? []);
+      })
       .catch(() => {});
     return () => ac.abort();
   }, []);
