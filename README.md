@@ -243,7 +243,8 @@ Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`, `1y`. The two
 long ones use 12-hour and daily buckets and a longer query timeout; how far
 back they reach depends on the database's retention. Anything over a week is
 read from InfluxDB a week at a time and joined, because one query over a month
-or more of Ruuvi rows runs InfluxDB out of memory. No SQL reaches the
+or more of Ruuvi rows runs InfluxDB out of memory. Those long answers are cached for ten
+minutes, since a 1Y read takes tens of seconds. No SQL reaches the
 backend from the browser.
 
 ## Things worth knowing before changing the queries

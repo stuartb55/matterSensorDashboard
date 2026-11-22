@@ -160,7 +160,9 @@ the live database.
   with "Memory Exhausted while Sorting". `timeChunks()` cuts ranges over a week
   into epoch-aligned, half-open week pieces (a week divides every preset's
   bucket), and `queryChunked()` runs them one after another. New bucketed
-  history queries over long ranges should go through it.
+  history queries over long ranges should go through it. `/api/history`
+  caches those ranges for ten minutes (`server/history-cache.js`), because a
+  1Y read takes tens of seconds and the browser polls every two minutes.
 - **Hot Water is `kind: "equipment"`** — it sits near 47 °C and must stay off any
   shared room scale, or every room curve flattens.
 
