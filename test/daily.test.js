@@ -36,3 +36,14 @@ test('baseLoad needs a day of data and ignores the odd low reading', () => {
   const watts = [5, ...Array.from({ length: 99 }, (_, i) => 40 + i)];
   assert.equal(baseLoad(watts), 43);
 });
+
+test('dailyHighLow finds each day\'s extremes and when they fell', async () => {
+  const { dailyHighLow } = await import('../web/src/daily.js');
+  const start = Date.UTC(2026, 10, 1) / 1000;
+  const t = [start, start + 3600, start + 86400];
+  const days = dailyHighLow(t, [18, 17, 16], [20, 22, null]);
+  assert.deepEqual(days[0].min, { value: 17, sec: start + 3600 });
+  assert.deepEqual(days[0].max, { value: 22, sec: start + 3600 });
+  assert.deepEqual(days[1].min, { value: 16, sec: start + 86400 });
+  assert.equal(days[1].max, null);
+});
