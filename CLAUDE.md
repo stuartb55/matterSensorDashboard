@@ -17,6 +17,7 @@ npm install
 npm run dev:server   # API on :8090 via `node --env-file=.env`; serves web/dist if built
 npm run dev:web      # Vite on :5174, proxies /api and /health to :8090
 npm run build        # Vite build -> web/dist
+npm test             # node:test unit tests in test/, InfluxDB mocked
 npm start            # production entry; expects the token already in the environment
 
 docker compose pull && docker compose up -d   # deploy the published image
@@ -26,13 +27,16 @@ docker compose up -d --build                 # build locally instead
 Typical loop is both dev servers at once — `dev:server` alone is API-only until
 something has run `build` (it logs a warning and skips static serving).
 
-There is no test suite, linter, or formatter configured. Don't invent commands
-for them; verify changes by running the app against the live database.
+`npm test` runs `node:test` files in `test/`. `test/influx-mock.js` replaces
+`fetch` for InfluxDB URLs and must be imported before any server module, since
+`server/influx.js` reads its settings at import time. The mock proves shaping,
+not SQL: a query DataFusion rejects still passes here, so verify new queries
+against the live database too. There is no linter or formatter.
 
-CI (`.github/workflows/ci.yml`) is the only automated check: build the frontend,
-boot the server against a closed port and assert what holds without InfluxDB
-(registry, static build, 503 health, API 404, example floor plan, Hue off), then build
-the image. Reproduce it locally with `npm run build`
+CI (`.github/workflows/ci.yml`) runs the unit tests, builds the frontend,
+boots the server against a closed port and asserts what holds without InfluxDB
+(registry, static build, 503 health, API 404, example floor plan, Hue off), then
+builds the image. Reproduce it locally with `npm run build`
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
 
@@ -97,8 +101,9 @@ bridge failure dims the Lights section but never sets the sensor error banner.
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on
 `visibilitychange`, and passes slices down. Components are presentational.
-`api.js` duplicates the range list for the button row — keep it in step with
-`RANGES` in `server/queries.js`.
+The range buttons come from `/api/sensors` (`publicRanges()`), so `RANGES` in
+`server/queries.js` is the only list; range keys are a count plus `h`, `d` or
+`y`, and `spansDays()` in `format.js` relies on that.
 
 ## Invariants that are easy to break
 

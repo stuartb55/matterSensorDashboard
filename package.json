@@ -10,7 +10,8 @@
     "dev:server": "node --env-file=.env server/index.js",
     "dev:web": "vite --config web/vite.config.js",
     "build": "vite build --config web/vite.config.js",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@fastify/static": "^10.0.0",
