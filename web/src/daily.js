@@ -105,3 +105,37 @@ export function dailyHighLow(t, lo, hi) {
     return { key: day.key, startSec: day.startSec, min, max };
   });
 }
+
+/**
+ * Rough time until a battery reaches its low mark, from the trend of its
+ * daily averages (averaging first smooths out the daily temperature swing
+ * that coin cells show). Needs a week of days to say anything.
+ * Returns { perDay, daysLeft, steady } or null when there is too little data.
+ * `low` is the level that counts as needing a change.
+ */
+export function batteryForecast(t, batt, low) {
+  const days = dayIndices(t)
+    .map((day) => {
+      const vals = day.idx.map((i) => batt[i]).filter((v) => v != null);
+      return vals.length ? { x: day.startSec / 86400, y: vals.reduce((a, b) => a + b, 0) / vals.length } : null;
+    })
+    .filter(Boolean);
+  if (days.length < 7) return null;
+
+  const n = days.length;
+  const mx = days.reduce((a, d) => a + d.x, 0) / n;
+  const my = days.reduce((a, d) => a + d.y, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  for (const d of days) {
+    sxy += (d.x - mx) * (d.y - my);
+    sxx += (d.x - mx) ** 2;
+  }
+  const perDay = sxx ? sxy / sxx : 0;
+  const latest = days.at(-1).y;
+  // Falling by less than one part in ten thousand of its level a day is
+  // indistinguishable from noise over a month.
+  const steady = perDay >= -Math.abs(latest) * 1e-4;
+  if (steady) return { perDay, daysLeft: null, steady: true };
+  return { perDay, daysLeft: Math.max(0, (latest - low) / -perDay), steady: false };
+}
