@@ -40,6 +40,15 @@
   --plan-window: #8fb8e0;
   --plan-label: #6b6a64;
 
+  /* Sequential ramp for shading rooms on the plan: one hue, light to dark, so
+     order reads without a key. Never used for a series. */
+  --heat-0: #e8f0fb;
+  --heat-1: #c9dcf4;
+  --heat-2: #a2c1ea;
+  --heat-3: #77a1dc;
+  --heat-4: #4e7fc9;
+  --heat-5: #2d5ea9;
+
   --radius: 14px;
   --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -75,6 +84,14 @@
     --plan-stairs: #4a4945;
     --plan-window: #4f7fae;
     --plan-label: #a3a29a;
+
+    /* Dark to bright on a dark surface: more is lighter. */
+    --heat-0: #1c2633;
+    --heat-1: #22364d;
+    --heat-2: #2b4a6e;
+    --heat-3: #386394;
+    --heat-4: #4e82bd;
+    --heat-5: #74a5dd;
   }
 }
 
@@ -108,6 +125,13 @@
   --plan-stairs: #4a4945;
   --plan-window: #4f7fae;
   --plan-label: #a3a29a;
+
+  --heat-0: #1c2633;
+  --heat-1: #22364d;
+  --heat-2: #2b4a6e;
+  --heat-3: #386394;
+  --heat-4: #4e82bd;
+  --heat-5: #74a5dd;
 }
 
 * {
@@ -1060,4 +1084,50 @@ button.door-card:active {
 }
 .damp-note.is-damp {
   color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------- plan shading */
+
+.shade-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.shade-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 0 2px 0 4px;
+}
+.heat-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0 4px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.heat-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.heat-swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+}
+.heat-swatch.is-none {
+  background: var(--plan-room);
+}
+.plan-labels.has-halo text {
+  fill: var(--text-primary);
+  stroke: var(--plan-floor);
+  paint-order: stroke;
+  stroke-linejoin: round;
 }

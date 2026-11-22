@@ -93,6 +93,12 @@ which is also the best starting point for your own.
 
 The file is re-read on every page load, so no restart is needed.
 
+**Shade** colours each room by the live temperature, humidity or CO₂ of the
+sensors placed inside it (averaged when there are several), on fixed bands so
+the same reading is always the same shade. Rooms are matched to sensors by
+marker position, so no extra configuration is needed; a room with no live
+sensor stays plain.
+
 ## Hue lights
 
 Philips Hue lights are read live from the Hue Bridge's local API and shown
