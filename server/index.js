@@ -13,6 +13,7 @@ import {
   probeUpstream,
   publicRanges,
   isPublicRange,
+  parseEnd,
   RANGES,
   DEFAULT_RANGE,
 } from './queries.js';
@@ -145,8 +146,14 @@ app.get('/api/history', async (req, reply) => {
   const ids = req.query.sensors
     ? String(req.query.sensors).split(',').map((s) => s.trim()).filter(Boolean)
     : null;
+  let end;
   try {
-    return await fetchHistory(range, ids);
+    end = parseEnd(req.query.end);
+  } catch (err) {
+    return reply.code(400).send({ error: 'bad_end', message: err.message });
+  }
+  try {
+    return await fetchHistory(range, ids, end);
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }
@@ -157,8 +164,14 @@ app.get('/api/doors/events', async (req, reply) => {
   if (!isPublicRange(range)) {
     return reply.code(400).send({ error: 'bad_range', allowed: publicRanges().map((r) => r.key) });
   }
+  let end;
   try {
-    return await fetchDoorEvents(range);
+    end = parseEnd(req.query.end);
+  } catch (err) {
+    return reply.code(400).send({ error: 'bad_end', message: err.message });
+  }
+  try {
+    return await fetchDoorEvents(range, end);
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }

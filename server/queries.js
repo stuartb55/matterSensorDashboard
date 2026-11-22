@@ -87,6 +87,47 @@ function sqlList(values) {
   return values.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(', ');
 }
 
+/**
+ * Earliest past end time a client may ask for. Well beyond the longest
+ * range, so any window that could hold data is reachable.
+ */
+const MAX_LOOKBACK_SEC = 400 * 86400;
+
+/**
+ * Validate a client-supplied window end (epoch seconds). Returns the integer,
+ * null for "now", or throws. Only a number that passes this ever reaches SQL,
+ * and then only as an ISO timestamp built here.
+ */
+export function parseEnd(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isInteger(n) || n < now - MAX_LOOKBACK_SEC) {
+    throw Object.assign(new Error('end must be epoch seconds within the last 400 days'), {
+      code: 'bad_end',
+    });
+  }
+  // A future end is just "now".
+  return n >= now ? null : n;
+}
+
+const isoSec = (sec) => new Date(sec * 1000).toISOString();
+
+/**
+ * The time condition for a range, ending now (relative to the database's own
+ * clock) or at a fixed past instant. `after` is the window's open start, also
+ * used to look up the state in force before it.
+ */
+function timeWindow(range, endSec = null) {
+  const { interval, spanSec } = RANGES[range];
+  if (endSec == null) {
+    const after = `now() - INTERVAL '${interval}'`;
+    return { after, clause: `time > ${after}` };
+  }
+  const after = `'${isoSec(endSec - spanSec)}'`;
+  return { after, clause: `time > ${after} AND time <= '${isoSec(endSec)}'` };
+}
+
 // ---------------------------------------------------------------------------
 // Latest readings
 // ---------------------------------------------------------------------------
@@ -315,11 +356,12 @@ export function doorTransitions(initial, rows) {
  * `{ range, start, end, doors: [{ id, label, initial, events: [{ ts, closed }] }] }`,
  * with `start`/`end` in epoch seconds and event times in epoch milliseconds.
  */
-export async function fetchDoorEvents(range = DEFAULT_RANGE) {
+export async function fetchDoorEvents(range = DEFAULT_RANGE, endSec = null) {
   if (!RANGES[range]) throw new Error(`unknown range: ${range}`);
-  const { interval, spanSec, timeoutMs } = RANGES[range];
+  const { spanSec, timeoutMs } = RANGES[range];
+  const win = timeWindow(range, endSec);
   const doors = SENSORS.filter((s) => s.kind === 'door');
-  const end = Math.floor(Date.now() / 1000);
+  const end = endSec ?? Math.floor(Date.now() / 1000);
   const start = end - spanSec;
   if (!doors.length) return { range, start, end, doors: [] };
 
@@ -331,7 +373,7 @@ export async function fetchDoorEvents(range = DEFAULT_RANGE) {
       `
       SELECT ${src.tag} AS key, ${src.contact} AS closed, time
       FROM ${src.table}
-      WHERE time > now() - INTERVAL '${interval}'
+      WHERE ${win.clause}
         AND ${src.tag} IN (${keys})
         AND ${src.contact} IS NOT NULL
       ORDER BY ${src.tag}, time`,
@@ -345,7 +387,7 @@ export async function fetchDoorEvents(range = DEFAULT_RANGE) {
       SELECT DISTINCT ON (${src.tag})
         ${src.tag} AS key, ${src.contact} AS closed, time
       FROM ${src.table}
-      WHERE time <= now() - INTERVAL '${interval}'
+      WHERE time <= ${win.after}
         AND ${src.tag} IN (${keys})
         AND ${src.contact} IS NOT NULL
       ORDER BY ${src.tag}, time DESC`,
@@ -462,10 +504,10 @@ export async function fetchLatest() {
 // History
 // ---------------------------------------------------------------------------
 
-async function historyForSource(source, sensors, range) {
+async function historyForSource(source, sensors, range, endSec) {
   if (!sensors.length) return [];
   const src = SOURCES[source];
-  const { interval, bucket } = RANGES[range];
+  const { bucket } = RANGES[range];
   const sql = `
     SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
       ${src.tag} AS key,
@@ -474,7 +516,7 @@ async function historyForSource(source, sensors, range) {
       max(${src.temp}) AS temp_hi,
       avg(${src.hum}) AS hum
     FROM ${src.table}
-    WHERE time > now() - INTERVAL '${interval}'
+    WHERE ${timeWindow(range, endSec).clause}
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
     GROUP BY bucket, ${src.tag}
     ORDER BY bucket`;
@@ -486,17 +528,17 @@ async function historyForSource(source, sensors, range) {
  * latestCo2: only the Ruuvi Air carries it, and a failure here must cost the
  * CO2 chart alone, not every Ruuvi series.
  */
-async function historyForCo2(sensors, range) {
+async function historyForCo2(sensors, range, endSec) {
   if (!sensors.length) return [];
   const src = SOURCES.ruuvi;
-  const { interval, bucket, timeoutMs } = RANGES[range];
+  const { bucket, timeoutMs } = RANGES[range];
   const sql = `
     SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
       ${src.tag} AS key,
       avg(${src.co2}) AS co2,
       max(${src.co2}) AS co2_hi
     FROM ${src.table}
-    WHERE time > now() - INTERVAL '${interval}'
+    WHERE ${timeWindow(range, endSec).clause}
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
       AND ${src.co2} IS NOT NULL
     GROUP BY bucket, ${src.tag}
@@ -524,10 +566,10 @@ const POWER_AGGREGATES = [
   ['kwhHi', 'max', 'kwh'],
 ];
 
-async function historyForPower(sensors, range) {
+async function historyForPower(sensors, range, endSec) {
   if (!sensors.length) return [];
   const src = SOURCES.matter;
-  const { interval, bucket } = RANGES[range];
+  const { bucket } = RANGES[range];
   try {
     const present = new Map(await powerFields());
     const aggs = POWER_AGGREGATES.filter(([, , field]) => present.has(field));
@@ -537,7 +579,7 @@ async function historyForPower(sensors, range) {
         ${src.tag} AS key,
         ${aggs.map(([alias, fn, field]) => `${fn}(${present.get(field).col}) AS "${alias}"`).join(',\n        ')}
       FROM ${src.table}
-      WHERE time > now() - INTERVAL '${interval}'
+      WHERE ${timeWindow(range, endSec).clause}
         AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
       GROUP BY bucket, ${src.tag}
       ORDER BY bucket`;
@@ -560,7 +602,7 @@ async function historyForPower(sensors, range) {
  * Matter sensors — whose history only starts partway through longer ranges —
  * render as a short line rather than a run of zeros.
  */
-export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
+export async function fetchHistory(range = DEFAULT_RANGE, ids = null, endSec = null) {
   if (!RANGES[range]) throw new Error(`unknown range: ${range}`);
   const { bucketSec, spanSec } = RANGES[range];
 
@@ -568,18 +610,18 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
   // series. Keeping doors out of this contract avoids presenting null charts.
   const wanted = (ids?.length ? SENSORS.filter((s) => ids.includes(s.id)) : SENSORS)
     .filter((s) => s.kind !== 'door');
-  if (!wanted.length) return { range, bucketSec, t: [], series: [] };
+  if (!wanted.length) return { range, end: endSec, bucketSec, t: [], series: [] };
 
   const climate = wanted.filter(isClimate);
   const [ruuviRows, matterRows, powerRows, co2Rows] = await Promise.all([
-    historyForSource('ruuvi', climate.filter((s) => s.source === 'ruuvi'), range),
-    historyForSource('matter', climate.filter((s) => s.source === 'matter'), range),
-    historyForPower(wanted.filter((s) => s.kind === 'power'), range),
-    historyForCo2(climate.filter((s) => s.source === 'ruuvi' && s.hasCo2), range),
+    historyForSource('ruuvi', climate.filter((s) => s.source === 'ruuvi'), range, endSec),
+    historyForSource('matter', climate.filter((s) => s.source === 'matter'), range, endSec),
+    historyForPower(wanted.filter((s) => s.kind === 'power'), range, endSec),
+    historyForCo2(climate.filter((s) => s.source === 'ruuvi' && s.hasCo2), range, endSec),
   ]);
 
   // date_bin anchors buckets to the epoch, so the axis is built the same way.
-  const nowSec = Math.floor(Date.now() / 1000);
+  const nowSec = endSec ?? Math.floor(Date.now() / 1000);
   const lastBucket = Math.floor(nowSec / bucketSec) * bucketSec;
   const firstBucket = Math.floor((nowSec - spanSec) / bucketSec) * bucketSec;
   const count = Math.round((lastBucket - firstBucket) / bucketSec) + 1;
@@ -653,5 +695,5 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
     for (const [alias] of POWER_AGGREGATES) target[alias][i] = row[alias] ?? null;
   }
 
-  return { range, bucketSec, t, series: [...series.values()] };
+  return { range, end: endSec, bucketSec, t, series: [...series.values()] };
 }

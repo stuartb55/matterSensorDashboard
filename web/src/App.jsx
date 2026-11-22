@@ -41,6 +41,24 @@ function FeedNotice({ feeds }) {
   );
 }
 
+const pad2 = (n) => String(n).padStart(2, '0');
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
+/** Epoch seconds at the end of a local YYYY-MM-DD day (midnight after it). */
+function dayEnd(day) {
+  if (!day) return null;
+  const [y, m, d] = day.split('-').map(Number);
+  return Math.floor(new Date(y, m - 1, d + 1).getTime() / 1000);
+}
+
+function fmtDayLabel(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
 /** Warmest and coolest room right now, among those reporting. */
 function RoomsSummary({ rooms }) {
   const live = rooms.filter((r) => !r.stale && r.tempC != null);
@@ -92,8 +110,15 @@ export default function App() {
   const [lightsDown, setLightsDown] = useState(false);
 
   // Keyed by range so a stale in-flight response can't overwrite a newer one.
+  // A past day to look at instead of "now": the window then ends at the close
+  // of that local day. Null means live.
+  const [day, setDay] = useState(null);
+  const end = useMemo(() => dayEnd(day), [day]);
+
   const historyRange = useRef(range);
   historyRange.current = range;
+  const historyEnd = useRef(end);
+  historyEnd.current = end;
 
   // Lights ride along with the latest readings but fail on their own: a bridge
   // that is down must not make the sensor database look unreachable.
@@ -139,9 +164,10 @@ export default function App() {
   const loadHistory = useCallback(async (forRange, signal) => {
     loadWeather(signal);
     try {
-      const data = await getHistory(forRange, null, signal);
-      // Discard if the user switched range while this was in flight.
-      if (historyRange.current !== forRange) return;
+      const forEnd = historyEnd.current;
+      const data = await getHistory(forRange, null, signal, forEnd);
+      // Discard if the user switched range or day while this was in flight.
+      if (historyRange.current !== forRange || historyEnd.current !== forEnd) return;
       setHistory(data);
       setError(null);
     } catch (err) {
@@ -176,7 +202,7 @@ export default function App() {
       if (!ac.signal.aborted) setRefetching(false);
     });
     return () => ac.abort();
-  }, [range, loadLatest, loadHistory]);
+  }, [range, end, loadLatest, loadHistory]);
 
   // Polling, paused while the tab is hidden so a backgrounded phone stops
   // waking its radio every 30 seconds.
@@ -188,10 +214,10 @@ export default function App() {
     const start = () => {
       stop();
       latestTimer = setInterval(() => loadLatest(ac.signal), LATEST_POLL_MS);
-      historyTimer = setInterval(
-        () => loadHistory(historyRange.current, ac.signal),
-        HISTORY_POLL_MS,
-      );
+      // A past window never changes, so only a live one is polled.
+      historyTimer = setInterval(() => {
+        if (historyEnd.current == null) loadHistory(historyRange.current, ac.signal);
+      }, HISTORY_POLL_MS);
     };
     const stop = () => {
       clearInterval(latestTimer);
@@ -204,7 +230,7 @@ export default function App() {
       } else {
         // Catch up immediately on return, then resume the schedule.
         loadLatest(ac.signal);
-        loadHistory(historyRange.current, ac.signal);
+        if (historyEnd.current == null) loadHistory(historyRange.current, ac.signal);
         start();
       }
     };
@@ -238,7 +264,8 @@ export default function App() {
     return map;
   }, [history]);
 
-  const rangeLabel = ranges.find((r) => r.key === range)?.label.toLowerCase() ?? range;
+  const baseLabel = ranges.find((r) => r.key === range)?.label.toLowerCase() ?? range;
+  const rangeLabel = end == null ? baseLabel : `the ${baseLabel} to the end of ${fmtDayLabel(day)}`;
   const rooms = readings?.filter((r) => r.kind === 'room') ?? [];
   const equipment = readings?.filter((r) => r.kind === 'equipment') ?? [];
   const doors = readings?.filter((r) => r.kind === 'door') ?? [];
@@ -311,6 +338,21 @@ export default function App() {
             {r.label}
           </button>
         ))}
+        <label className={`range-btn date-pick${day ? ' is-set' : ''}`}>
+          <span>{day ? `To ${fmtDayLabel(day)}` : 'Pick a day'}</span>
+          <input
+            type="date"
+            aria-label="Show the range ending on this day"
+            value={day ?? ''}
+            max={todayKey()}
+            onChange={(e) => setDay(e.target.value && e.target.value < todayKey() ? e.target.value : null)}
+          />
+        </label>
+        {day && (
+          <button type="button" className="range-btn" onClick={() => setDay(null)}>
+            Back to now
+          </button>
+        )}
       </div>
 
       {!readings ? (
@@ -457,6 +499,7 @@ export default function App() {
         <DoorSheet
           reading={selectedReading}
           range={range}
+          end={end}
           rangeLabel={rangeLabel}
           onClose={() => setSelected(null)}
         />

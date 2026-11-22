@@ -1,4 +1,7 @@
 import { fmtTime } from '../format.js';
+import { downloadCsv, toCsv } from '../csv.js';
+
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /**
  * The WCAG-clean twin of a chart: every plotted value reachable as text, so
@@ -14,7 +17,15 @@ export default function TableView({ t, columns, range, caption }) {
   if (!rows.length) return <p className="empty">No readings in this window.</p>;
 
   return (
-    <div className="table-wrap">
+    <>
+      <button
+        type="button"
+        className="link-btn"
+        onClick={() => downloadCsv(`${slug(caption)}.csv`, toCsv(t, columns))}
+      >
+        Download CSV
+      </button>
+      <div className="table-wrap">
       <table>
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -41,5 +52,6 @@ export default function TableView({ t, columns, range, caption }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }

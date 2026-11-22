@@ -64,8 +64,10 @@ database names and column names off the wire.
 
 **The browser never sends SQL.** `server/queries.js` builds every statement from
 registry values and the `RANGES` allowlist (`1h`/`6h`/`24h`/`7d`/`30d`/`90d`/`1y`); the only
-client input reaching a query is a range key and a list of sensor ids matched
-against the registry. `server/influx.js` is the sole holder of the token and the
+client input reaching a query is a range key, a list of sensor ids matched
+against the registry, and an optional window end that `parseEnd()` accepts only
+as an integer within the last 400 days and writes into SQL as an ISO timestamp
+it built itself (`timeWindow()`). `server/influx.js` is the sole holder of the token and the
 only module that talks to InfluxDB. Keep that split.
 
 **Two databases, merged in the backend.** `ruuvi` and `matter` cannot be joined,

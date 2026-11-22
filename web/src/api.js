@@ -21,9 +21,10 @@ export const getSensors = (signal) => getJson('/api/sensors', signal);
 
 export const getLatest = (signal) => getJson('/api/readings/latest', signal);
 
-export const getHistory = (range, ids, signal) => {
+export const getHistory = (range, ids, signal, end = null) => {
   const params = new URLSearchParams({ range });
   if (ids?.length) params.set('sensors', ids.join(','));
+  if (end != null) params.set('end', String(end));
   return getJson(`/api/history?${params}`, signal);
 };
 
@@ -31,8 +32,11 @@ export const getFloorplan = (signal) => getJson('/api/floorplan', signal);
 
 export const getLights = (signal) => getJson('/api/lights', signal);
 
-export const getDoorEvents = (range, signal) =>
-  getJson(`/api/doors/events?${new URLSearchParams({ range })}`, signal);
+export const getDoorEvents = (range, signal, end = null) =>
+  getJson(
+    `/api/doors/events?${new URLSearchParams(end == null ? { range } : { range, end: String(end) })}`,
+    signal,
+  );
 
 export const getWeather = (signal) => getJson('/api/weather', signal);
 
