@@ -15,7 +15,10 @@ test('parseInfluxTime reads naive timestamps as UTC', () => {
 
 test('publicRanges lists every preset with a label', () => {
   const ranges = publicRanges();
-  assert.deepEqual(ranges.map((r) => r.key), Object.keys(RANGES));
+  assert.deepEqual(
+    ranges.map((r) => r.key),
+    Object.keys(RANGES).filter((k) => !RANGES[k].hidden),
+  );
   for (const r of ranges) assert.ok(r.label && r.spanSec > 0);
 });
 
@@ -156,4 +159,15 @@ test('a feed is down only when every sensor on it is stale', async () => {
   assert.deepEqual([ruuvi.down, ruuvi.lastSeenSec, ruuvi.label], [true, null, 'Ruuvi']);
   assert.equal(matter.down, false);
   assert.ok(matter.lastSeenSec >= 59 && matter.lastSeenSec <= 61);
+});
+
+test('the daily preset is internal: not a button and not a public range', async () => {
+  const { isPublicRange } = await import('../server/queries.js');
+  assert.ok(!publicRanges().some((r) => r.key === 'daily'));
+  assert.equal(isPublicRange('daily'), false);
+  assert.equal(isPublicRange('24h'), true);
+  answer(() => []);
+  const h = await fetchHistory('daily');
+  assert.equal(h.bucketSec, 3600);
+  assert.equal(h.t.length, 31 * 24 + 1);
 });

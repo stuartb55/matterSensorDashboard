@@ -1151,3 +1151,45 @@ button.door-card:active {
 .masthead-meta .status {
   margin: 0;
 }
+
+/* ------------------------------------------------------------ daily bars */
+
+.daily-bars {
+  margin: 4px 4px 0;
+}
+.daily-bars svg {
+  display: block;
+  width: 100%;
+}
+.daily-bars rect.is-partial {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 3 2;
+}
+.daily-axis {
+  stroke: var(--axis);
+  vector-effect: non-scaling-stroke;
+}
+.daily-bars-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.daily-bars-readout {
+  color: var(--text-secondary);
+  text-align: center;
+}
+.money {
+  font-variant-numeric: tabular-nums;
+}
+.stat-sub {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}

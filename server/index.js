@@ -12,6 +12,7 @@ import {
   feedHealth,
   probeUpstream,
   publicRanges,
+  isPublicRange,
   RANGES,
   DEFAULT_RANGE,
 } from './queries.js';
@@ -138,8 +139,8 @@ app.get('/api/readings/latest', async (_req, reply) => {
 
 app.get('/api/history', async (req, reply) => {
   const range = String(req.query.range || DEFAULT_RANGE);
-  if (!RANGES[range]) {
-    return reply.code(400).send({ error: 'bad_range', allowed: Object.keys(RANGES) });
+  if (!isPublicRange(range)) {
+    return reply.code(400).send({ error: 'bad_range', allowed: publicRanges().map((r) => r.key) });
   }
   const ids = req.query.sensors
     ? String(req.query.sensors).split(',').map((s) => s.trim()).filter(Boolean)
@@ -153,11 +154,45 @@ app.get('/api/history', async (req, reply) => {
 
 app.get('/api/doors/events', async (req, reply) => {
   const range = String(req.query.range || DEFAULT_RANGE);
-  if (!RANGES[range]) {
-    return reply.code(400).send({ error: 'bad_range', allowed: Object.keys(RANGES) });
+  if (!isPublicRange(range)) {
+    return reply.code(400).send({ error: 'bad_range', allowed: publicRanges().map((r) => r.key) });
   }
   try {
     return await fetchDoorEvents(range);
+  } catch (err) {
+    return sendUpstreamError(reply, err, app.log);
+  }
+});
+
+// Thirty-one days of hourly buckets for every sensor, which the browser
+// regroups into calendar days for energy totals and daily highs and lows. It
+// only changes hour by hour, so it is cached for ten minutes.
+const DAILY_TTL_MS = 10 * 60_000;
+let dailyCache = { at: 0, data: null, inflight: null };
+
+function energyTariff() {
+  const perKwh = Number.parseFloat(process.env.ENERGY_PRICE ?? '');
+  if (!Number.isFinite(perKwh) || perKwh < 0) return null;
+  return { perKwh, currency: (process.env.ENERGY_CURRENCY || '£').slice(0, 3) };
+}
+
+app.get('/api/daily', async (_req, reply) => {
+  try {
+    if (!dailyCache.data || Date.now() - dailyCache.at >= DAILY_TTL_MS) {
+      if (!dailyCache.inflight) {
+        dailyCache.inflight = fetchHistory('daily')
+          .then((data) => {
+            dailyCache = { at: Date.now(), data, inflight: null };
+            return data;
+          })
+          .catch((err) => {
+            dailyCache.inflight = null;
+            throw err;
+          });
+      }
+      await dailyCache.inflight;
+    }
+    return { ...dailyCache.data, tariff: energyTariff() };
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }

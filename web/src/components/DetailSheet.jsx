@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import Sheet, { CloseButton } from './Sheet.jsx';
 import TimeChart from './TimeChart.jsx';
 import TableView from './TableView.jsx';
+import DailyBars from './DailyBars.jsx';
+import { baseLoad, dailyEnergy } from '../daily.js';
 import { seriesColor } from '../palette.js';
 import {
   bridgeGaps,
@@ -176,7 +178,124 @@ function ClimateHistory(props) {
   );
 }
 
-function PowerHistory({ reading, series, drawn, t, bucketSec, range, rangeLabel, color }) {
+const fmtDay = (sec) =>
+  new Date(sec * 1000).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtShortDay = (sec) => new Date(sec * 1000).toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+function fmtMoney(amount, tariff) {
+  if (amount == null || !tariff) return null;
+  return `${tariff.currency}${amount < 10 ? amount.toFixed(2) : Math.round(amount).toLocaleString()}`;
+}
+
+/**
+ * Calendar-day totals from /api/daily, independent of the selected range:
+ * the last 30 days as bars, today / 7 / 30-day totals, cost where a tariff is
+ * set, and the always-on draw with what it costs a year.
+ */
+function EnergyDays({ reading, daily, color }) {
+  const [showTable, setShowTable] = useState(false);
+  const series = daily?.series.find((s) => s.id === reading.id);
+  const days = useMemo(
+    () => (series ? dailyEnergy(daily.t, series, daily.bucketSec) : []),
+    [daily, series],
+  );
+  if (!series || !days.some((d) => d.kwh != null)) return null;
+
+  const tariff = daily.tariff;
+  const last = (n) => days.slice(-n).reduce((sum, d) => sum + (d.kwh ?? 0), 0);
+  const today = days.at(-1);
+  const week = last(7);
+  const month = last(30);
+  const anyEstimate = days.some((d) => d.estimated);
+  // A week of hourly averages, so the quietest nights set the floor.
+  const base = baseLoad(series.watts.slice(-7 * 24));
+  const baseYearKwh = base == null ? null : (base * 24 * 365) / 1000;
+  const bars = days.slice(-30).map((d) => ({
+    key: d.key,
+    label: fmtShortDay(d.startSec),
+    value: d.kwh,
+    partial: d.partial,
+  }));
+
+  return (
+    <section className="panel">
+      <h3 className="panel-title">Daily use</h3>
+      <p className="panel-sub">
+        Energy per calendar day over the last 30 days. Today and the first day are part days,
+        drawn as outlines.{anyEstimate && ' Days marked ≈ are partly estimated from average power.'}
+      </p>
+      <DailyBars
+        bars={bars}
+        unit=" kWh"
+        digits={2}
+        color={color}
+        ariaLabel={`Energy per day for ${reading.label} over the last 30 days`}
+      />
+      <dl className="stats">
+        {[
+          ['Today', today.kwh],
+          ['7 days', week],
+          ['30 days', month],
+        ].map(([label, kwh]) => (
+          <div className="stat" key={label}>
+            <dt>{label}</dt>
+            <dd>
+              {fmtEnergy(kwh)} kWh
+              {tariff && <div className="stat-sub money">{fmtMoney(kwh * tariff.perKwh, tariff)}</div>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {base != null && (
+        <p className="panel-sub damp-note">
+          Always-on draw about {Math.round(base)} W, which is {Math.round(baseYearKwh)} kWh a year
+          {tariff ? ` (${fmtMoney(baseYearKwh * tariff.perKwh, tariff)} at ${tariff.currency}${tariff.perKwh} per kWh)` : ''}.
+        </p>
+      )}
+      {!tariff && (
+        <p className="panel-sub">Set ENERGY_PRICE in the server’s .env to see costs.</p>
+      )}
+      <button
+        type="button"
+        className="link-btn"
+        onClick={() => setShowTable((v) => !v)}
+        aria-expanded={showTable}
+      >
+        {showTable ? 'Hide table' : 'View as table'}
+      </button>
+      {showTable && (
+        <div className="table-wrap">
+          <table>
+            <caption className="sr-only">Energy per day for {reading.label}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">kWh</th>
+                {tariff && <th scope="col">Cost</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {[...days].reverse().map((d) => (
+                <tr key={d.key}>
+                  <td>
+                    {fmtDay(d.startSec)}
+                    {d.partial ? ' (part)' : ''}
+                  </td>
+                  <td>
+                    {d.kwh == null ? '—' : `${d.estimated ? '≈ ' : ''}${d.kwh.toFixed(2)}`}
+                  </td>
+                  {tariff && <td>{d.kwh == null ? '—' : fmtMoney(d.kwh * tariff.perKwh, tariff)}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PowerHistory({ reading, series, drawn, t, bucketSec, range, rangeLabel, color, daily }) {
   const used = energyUsed(series, bucketSec);
   const hasVolts = series.volts.some((v) => v != null);
   return (
@@ -223,6 +342,8 @@ function PowerHistory({ reading, series, drawn, t, bucketSec, range, rangeLabel,
         </section>
       )}
 
+      <EnergyDays reading={reading} daily={daily} color={color} />
+
       {hasVolts && (
         <section className="panel">
           <h3 className="panel-title">Voltage</h3>
@@ -256,6 +377,7 @@ export default function DetailSheet({
   bucketSec,
   range,
   rangeLabel,
+  daily,
   onClose,
 }) {
   const [showTable, setShowTable] = useState(false);
@@ -282,7 +404,7 @@ export default function DetailSheet({
   const hasHistory = series && t.length > 0;
   const battery = fmtBattery(reading.battery, reading.batteryKind);
   const power = fmtPower(reading.watts);
-  const historyProps = { reading, series, drawn, t, bucketSec, range, rangeLabel, color };
+  const historyProps = { reading, series, drawn, t, bucketSec, range, rangeLabel, color, daily };
 
   return (
     <Sheet label={`${reading.label} detail`} onClose={onClose}>

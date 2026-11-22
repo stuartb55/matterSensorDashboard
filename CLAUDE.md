@@ -87,6 +87,13 @@ the same state collapsed by `doorTransitions()`.
 The whole frontend assumes this shared axis; charts, sparklines and tables index
 into it directly.
 
+**Calendar days are built in the browser.** `/api/daily` is `fetchHistory`
+over the hidden `daily` preset (31 days of hourly buckets; `hidden` keeps it
+off the buttons and out of `/api/history`), cached 10 minutes. `web/src/daily.js`
+regroups it into local days, because `date_bin` days are UTC. Energy per day
+sums per-bucket rises of the lifetime counter (`bucketEnergy`), not per-day
+min/max, so the step between buckets isn't lost.
+
 **The floor plan is host data, never repo data.** `server/floorplan.js` reads
 `floorplan/floorplan.json` from `FLOORPLAN_DIR` (gitignored, dockerignored,
 mounted read-only), falling back to the generic `server/floorplan-example/`.
