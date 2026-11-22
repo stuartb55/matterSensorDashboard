@@ -1256,3 +1256,42 @@ button.door-card:active {
 .heating-list .event-when {
   white-space: nowrap;
 }
+
+/* ----------------------------------------------------------- wall display */
+
+.app-foot {
+  margin-top: 28px;
+  text-align: center;
+}
+.wall-clock {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.wall-clock time {
+  font-size: 2.6rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.wall-clock span {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+/* Read from across a room: everything a step larger, and the plan and cards
+   given the whole width of a landscape tablet. */
+.is-wall {
+  font-size: 19px;
+}
+.is-wall .app {
+  max-width: 1400px;
+}
+.is-wall .masthead .status {
+  font-size: 0.9rem;
+}
+@media (min-width: 900px) {
+  .is-wall .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
