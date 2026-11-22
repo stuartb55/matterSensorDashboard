@@ -7,6 +7,7 @@ import PowerCard from './components/PowerCard.jsx';
 import LightCard from './components/LightCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
+import DoorSheet from './components/DoorSheet.jsx';
 import FloorPlan from './components/FloorPlan.jsx';
 
 const LATEST_POLL_MS = 30_000;
@@ -245,7 +246,7 @@ export default function App() {
               </div>
               <div className="grid door-grid">
                 {doors.map((r) => (
-                  <DoorCard key={r.id} reading={r} />
+                  <DoorCard key={r.id} reading={r} onOpen={setSelected} />
                 ))}
               </div>
             </>
@@ -355,7 +356,16 @@ export default function App() {
         </div>
       )}
 
-      {selectedReading && (
+      {selectedReading?.kind === 'door' && (
+        <DoorSheet
+          reading={selectedReading}
+          range={range}
+          rangeLabel={rangeLabel}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      {selectedReading && selectedReading.kind !== 'door' && (
         <DetailSheet
           reading={selectedReading}
           series={seriesById.get(selectedReading.id)}

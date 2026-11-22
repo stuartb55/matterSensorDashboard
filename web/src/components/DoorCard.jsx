@@ -1,15 +1,17 @@
 import { fmtAge } from '../format.js';
 
-/** Current contact state for an event-driven door sensor. */
-export default function DoorCard({ reading }) {
-  const { label, closed, stateTs } = reading;
+/** Current contact state for an event-driven door sensor; opens its history. */
+export default function DoorCard({ reading, onOpen }) {
+  const { id, label, closed, stateTs } = reading;
   const state = closed == null ? 'Unknown' : closed ? 'Closed' : 'Open';
   const changedAge = stateTs == null ? 'no recorded change' : fmtAge(Math.max(0, Math.round((Date.now() - stateTs) / 1000)));
 
   return (
-    <article
+    <button
+      type="button"
       className="door-card"
-      aria-label={`${label}: ${state}. Last changed ${changedAge}.`}
+      onClick={() => onOpen(id)}
+      aria-label={`${label}: ${state}. Last changed ${changedAge}. Open history.`}
     >
       <div className="card-top">
         <p className="card-label">{label}</p>
@@ -19,6 +21,6 @@ export default function DoorCard({ reading }) {
         {state}
       </div>
       <p className="door-sub">Last changed {changedAge}</p>
-    </article>
+    </button>
   );
 }

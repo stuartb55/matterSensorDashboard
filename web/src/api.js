@@ -30,3 +30,6 @@ export const getHistory = (range, ids, signal) => {
 export const getFloorplan = (signal) => getJson('/api/floorplan', signal);
 
 export const getLights = (signal) => getJson('/api/lights', signal);
+
+export const getDoorEvents = (range, signal) =>
+  getJson(`/api/doors/events?${new URLSearchParams({ range })}`, signal);
