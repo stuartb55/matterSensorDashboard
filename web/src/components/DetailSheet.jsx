@@ -3,7 +3,8 @@ import Sheet, { CloseButton } from './Sheet.jsx';
 import TimeChart from './TimeChart.jsx';
 import TableView from './TableView.jsx';
 import DailyBars from './DailyBars.jsx';
-import { baseLoad, dailyEnergy } from '../daily.js';
+import DailyRange from './DailyRange.jsx';
+import { baseLoad, dailyEnergy, dailyHighLow } from '../daily.js';
 import { seriesColor } from '../palette.js';
 import {
   bridgeGaps,
@@ -134,6 +135,102 @@ function Comfort({ reading, series, t, bucketSec, range, rangeLabel, color }) {
   );
 }
 
+const fmtClock = (sec) =>
+  new Date(sec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Lows and highs per calendar day over the last 30 days, from /api/daily and
+ * independent of the selected range, plus the extremes of the whole stretch.
+ * Times are the hour in which the reading fell.
+ */
+function DailyClimate({ reading, daily, color }) {
+  const [showTable, setShowTable] = useState(false);
+  const series = daily?.series.find((s) => s.id === reading.id);
+  const days = useMemo(
+    () => (series ? dailyHighLow(daily.t, series.tempLo, series.tempHi) : []),
+    [daily, series],
+  );
+  const recent = days.slice(-30);
+  if (!recent.some((d) => d.min != null)) return null;
+
+  const today = recent.at(-1);
+  let coldest = null;
+  let warmest = null;
+  for (const d of recent) {
+    if (d.min && (!coldest || d.min.value < coldest.value)) coldest = d.min;
+    if (d.max && (!warmest || d.max.value > warmest.value)) warmest = d.max;
+  }
+
+  return (
+    <section className="panel">
+      <h3 className="panel-title">Daily highs and lows</h3>
+      <p className="panel-sub">
+        {today.min
+          ? `Today so far: low ${today.min.value.toFixed(1)}° around ${fmtClock(today.min.sec)}, high ${today.max.value.toFixed(1)}° around ${fmtClock(today.max.sec)}.`
+          : 'No reading yet today.'}
+      </p>
+      <DailyRange
+        days={recent.map((d) => ({
+          key: d.key,
+          label: fmtShortDay(d.startSec),
+          min: d.min?.value ?? null,
+          max: d.max?.value ?? null,
+        }))}
+        unit="°C"
+        color={color}
+        ariaLabel={`Daily low and high temperature for ${reading.label} over the last 30 days`}
+      />
+      <dl className="stats stats-2">
+        <div className="stat">
+          <dt>30-day low</dt>
+          <dd>
+            {coldest.value.toFixed(1)}°C
+            <div className="stat-sub">{fmtDay(coldest.sec)}</div>
+          </dd>
+        </div>
+        <div className="stat">
+          <dt>30-day high</dt>
+          <dd>
+            {warmest.value.toFixed(1)}°C
+            <div className="stat-sub">{fmtDay(warmest.sec)}</div>
+          </dd>
+        </div>
+      </dl>
+      <button
+        type="button"
+        className="link-btn"
+        onClick={() => setShowTable((v) => !v)}
+        aria-expanded={showTable}
+      >
+        {showTable ? 'Hide table' : 'View as table'}
+      </button>
+      {showTable && (
+        <div className="table-wrap">
+          <table>
+            <caption className="sr-only">Daily low and high for {reading.label}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Low °C</th>
+                <th scope="col">High °C</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...recent].reverse().map((d) => (
+                <tr key={d.key}>
+                  <td>{fmtDay(d.startSec)}</td>
+                  <td>{d.min ? d.min.value.toFixed(1) : '—'}</td>
+                  <td>{d.max ? d.max.value.toFixed(1) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ClimateHistory(props) {
   const { reading, series, drawn, t, range, rangeLabel, color } = props;
   return (
@@ -170,6 +267,8 @@ function ClimateHistory(props) {
         />
         <Stats values={series.hum} unit="%" digits={0} />
       </section>
+
+      <DailyClimate reading={reading} daily={props.daily} color={color} />
 
       {reading.kind === 'room' && <Comfort {...props} />}
 
