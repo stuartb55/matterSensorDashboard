@@ -70,6 +70,7 @@ jobs:
 
           echo "Hue lights are off when no bridge is configured"
           curl -sf http://127.0.0.1:8090/api/lights | grep -q '"enabled":false'
+          curl -sf http://127.0.0.1:8090/api/lights/history | grep -q '"enabled":false'
 
           echo "outdoor weather is off when no location is configured"
           curl -sf http://127.0.0.1:8090/api/weather | grep -q '"enabled":false'

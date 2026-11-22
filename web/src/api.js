@@ -41,3 +41,9 @@ export const getDoorEvents = (range, signal, end = null) =>
 export const getWeather = (signal) => getJson('/api/weather', signal);
 
 export const getDaily = (signal) => getJson('/api/daily', signal);
+
+export const getLightHistory = (range, signal, end = null) =>
+  getJson(
+    `/api/lights/history?${new URLSearchParams(end == null ? { range } : { range, end: String(end) })}`,
+    signal,
+  );

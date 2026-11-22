@@ -22,8 +22,11 @@ function lightState(l) {
   return { text: l.brightness != null ? `${l.brightness}%` : 'On', cls: 'is-on' };
 }
 
-/** Current state of the Hue lights in one room. View-only. */
-export default function LightCard({ room }) {
+/**
+ * Current state of the Hue lights in one room. View-only: the bridge is never
+ * written to. `onOpen` is passed only when the server records light history.
+ */
+export default function LightCard({ room, onOpen = null }) {
   const { label, lights, onCount, total, unreachable } = room;
   const summary = lightsSummary(room);
   const headline = summary.state === 'unknown' ? 'Unreachable' : onCount === 0 ? 'Off' : onCount === total ? 'On' : `${onCount} of ${total} on`;
@@ -52,6 +55,11 @@ export default function LightCard({ room }) {
           );
         })}
       </ul>
+      {onOpen && (
+        <button type="button" className="link-btn card-more" onClick={() => onOpen(room.id)}>
+          History<span className="sr-only"> of {label} lights</span>
+        </button>
+      )}
     </article>
   );
 }

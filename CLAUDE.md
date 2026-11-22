@@ -70,7 +70,7 @@ registry values and the `RANGES` allowlist (`1h`/`6h`/`24h`/`7d`/`30d`/`90d`/`1y
 client input reaching a query is a range key, a list of sensor ids matched
 against the registry, and an optional window end that `parseEnd()` accepts only
 as an integer within the last 400 days and writes into SQL as an ISO timestamp
-it built itself (`timeWindow()`). `server/influx.js` is the sole holder of the token and the
+it built itself (`timeWindow()`). `server/influx.js` is the sole holder of the tokens and the
 only module that talks to InfluxDB. Keep that split.
 
 **Two databases, merged in the backend.** `ruuvi` and `matter` cannot be joined,
@@ -111,7 +111,12 @@ property listing. The browser exports edits as JSON and the server never writes.
 Hue Bridge's CLIP v2 API (`HUE_BRIDGE`, `HUE_APP_KEY` from `.env`) and groups
 lights by Hue room into `lights:<slug>` entries; it is the only module that
 talks to the bridge and it never writes to it. The feature is off when either
-value is missing. Lights have no history and no detail sheet. Floor plan
+value is missing. The bridge keeps no history, so `server/hue-history.js`
+records one row per room per minute (`hue_rooms` in `HUE_HISTORY_DB`) with its
+own token, `HUE_HISTORY_TOKEN`, and reads it back bucketed onto the shared axis
+for `/api/lights/history` and `LightSheet.jsx`. This recorder is the only
+thing in the dashboard that writes to InfluxDB; without the token it doesn't
+run and light cards have no History button. There is no light control. Floor plan
 markers accept `lights:` ids by pattern, since they are not in the registry. A
 bridge failure dims the Lights section but never sets the sensor error banner.
 

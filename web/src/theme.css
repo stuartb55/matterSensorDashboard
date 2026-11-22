@@ -1295,3 +1295,9 @@ button.door-card:active {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Opens a Hue room's recorded history; sits under the light list. */
+.light-card .card-more {
+  display: block;
+  margin: 4px 0 -10px auto;
+}
