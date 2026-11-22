@@ -348,6 +348,34 @@ async function historyForSource(source, sensors, range) {
 }
 
 /**
+ * Bucketed CO2, kept out of historyForSource for the same reasons as
+ * latestCo2: only the Ruuvi Air carries it, and a failure here must cost the
+ * CO2 chart alone, not every Ruuvi series.
+ */
+async function historyForCo2(sensors, range) {
+  if (!sensors.length) return [];
+  const src = SOURCES.ruuvi;
+  const { interval, bucket, timeoutMs } = RANGES[range];
+  const sql = `
+    SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
+      ${src.tag} AS key,
+      avg(${src.co2}) AS co2,
+      max(${src.co2}) AS co2_hi
+    FROM ${src.table}
+    WHERE time > now() - INTERVAL '${interval}'
+      AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
+      AND ${src.co2} IS NOT NULL
+    GROUP BY bucket, ${src.tag}
+    ORDER BY bucket`;
+  try {
+    return await query(src.db, sql, { timeoutMs });
+  } catch (err) {
+    console.warn(`CO2 history query failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Bucketed electrical history. Power keeps its min and max per bucket so a
  * kettle's short spike survives the averaging; the energy counter keeps both
  * ends of each bucket so consumption can be read off as its rise.
@@ -409,10 +437,11 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
   if (!wanted.length) return { range, bucketSec, t: [], series: [] };
 
   const climate = wanted.filter(isClimate);
-  const [ruuviRows, matterRows, powerRows] = await Promise.all([
+  const [ruuviRows, matterRows, powerRows, co2Rows] = await Promise.all([
     historyForSource('ruuvi', climate.filter((s) => s.source === 'ruuvi'), range),
     historyForSource('matter', climate.filter((s) => s.source === 'matter'), range),
     historyForPower(wanted.filter((s) => s.kind === 'power'), range),
+    historyForCo2(climate.filter((s) => s.source === 'ruuvi' && s.hasCo2), range),
   ]);
 
   // date_bin anchors buckets to the epoch, so the axis is built the same way.
@@ -444,6 +473,8 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
         ...(s.kind === 'power'
           ? Object.fromEntries(POWER_AGGREGATES.map(([alias]) => [alias, empty()]))
           : { temp: empty(), tempLo: empty(), tempHi: empty(), hum: empty() }),
+        // CO2 bucket average and peak, only on sensors that measure it.
+        ...(s.hasCo2 ? { co2: empty(), co2Hi: empty() } : {}),
       },
     ]),
   );
@@ -463,6 +494,18 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null) {
       target.tempHi[i] = row.temp_hi ?? null;
       target.hum[i] = row.hum ?? null;
     }
+  }
+
+  for (const row of co2Rows) {
+    const sensor = lookup('ruuvi', row.key);
+    const target = sensor?.hasCo2 && series.get(sensor.id);
+    if (!target) continue;
+    const ms = parseInfluxTime(row.bucket);
+    if (ms == null) continue;
+    const i = indexOf(Math.floor(ms / 1000));
+    if (i === -1) continue;
+    target.co2[i] = row.co2 ?? null;
+    target.co2Hi[i] = row.co2_hi ?? null;
   }
 
   for (const row of powerRows) {

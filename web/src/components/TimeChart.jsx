@@ -38,6 +38,10 @@ function isolatedIndices(values) {
  *
  * `band` optionally supplies the min/max envelope behind a single series, so a
  * downsampled average doesn't hide the real swing inside each bucket.
+ *
+ * `guides` are reference levels ([{ value, label }]), drawn as a thin muted
+ * rule with its label at the right-hand end. They are kept inside the y range
+ * only when the data comes near them, so a guide never squashes the series.
  */
 export default function TimeChart({
   t,
@@ -46,6 +50,7 @@ export default function TimeChart({
   unit,
   height = 200,
   band = null,
+  guides = null,
   ariaLabel,
 }) {
   const hostRef = useRef(null);
@@ -133,6 +138,30 @@ export default function TimeChart({
         bands,
         padding: [10, 10, 0, 2],
         hooks: {
+          draw: [
+            (u) => {
+              if (!guides?.length) return;
+              const { ctx, bbox } = u;
+              const [yMin, yMax] = [u.scales.y.min, u.scales.y.max];
+              ctx.save();
+              ctx.strokeStyle = theme.axis;
+              ctx.fillStyle = theme.muted;
+              ctx.lineWidth = 1;
+              ctx.font = axisFont;
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'bottom';
+              for (const g of guides) {
+                if (g.value < yMin || g.value > yMax) continue;
+                const y = Math.round(u.valToPos(g.value, 'y', true)) + 0.5;
+                ctx.beginPath();
+                ctx.moveTo(bbox.left, y);
+                ctx.lineTo(bbox.left + bbox.width, y);
+                ctx.stroke();
+                if (g.label) ctx.fillText(g.label, bbox.left + bbox.width - 4, y - 2);
+              }
+              ctx.restore();
+            },
+          ],
           setCursor: [
             (u) => {
               const { idx, left } = u.cursor;
@@ -181,7 +210,7 @@ export default function TimeChart({
       plotRef.current = null;
       setHover(null);
     };
-  }, [t, series, width, height, range, band]);
+  }, [t, series, width, height, range, band, guides]);
 
   const showTooltip = hover && hover.rows.length > 0;
 

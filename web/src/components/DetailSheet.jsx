@@ -12,8 +12,15 @@ import {
   fmtPower,
   fmtTemp,
   fmtBattery,
+  fmtDuration,
   summarise,
+  timeAtOrAbove,
 } from '../format.js';
+
+// Above about 1,000 ppm a room is due some fresh air; it is the level most
+// ventilation guidance uses as the line between fine and stuffy.
+const CO2_VENTILATE = 1000;
+const CO2_GUIDES = [{ value: CO2_VENTILATE, label: '1,000 ppm' }];
 
 /**
  * `lo` and `hi` optionally supply per-bucket extremes, so Min and Max report
@@ -51,7 +58,37 @@ function Stats({ values, unit, digits = 1, lo = null, hi = null }) {
   );
 }
 
-function ClimateHistory({ reading, series, drawn, t, range, rangeLabel, color }) {
+function Co2History({ reading, series, drawn, t, bucketSec, range, rangeLabel, color }) {
+  const above = timeAtOrAbove(series.co2Hi, CO2_VENTILATE, bucketSec);
+  return (
+    <section className="panel">
+      <h3 className="panel-title">CO₂</h3>
+      <p className="panel-sub">
+        Bucket average over {rangeLabel}. The rule marks {CO2_GUIDES[0].label}, roughly where a
+        room starts to feel stuffy and is worth airing.
+      </p>
+      <TimeChart
+        t={t}
+        range={range}
+        unit=" ppm"
+        height={180}
+        ariaLabel={`CO2 for ${reading.label} over ${rangeLabel}`}
+        series={[{ label: 'CO₂', values: drawn.co2, color }]}
+        guides={CO2_GUIDES}
+      />
+      <Stats values={series.co2} hi={series.co2Hi} unit=" ppm" digits={0} />
+      {above != null && (
+        <p className="panel-sub">
+          Peaked at or above {CO2_GUIDES[0].label} for about {fmtDuration(above)} of{' '}
+          {rangeLabel}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ClimateHistory(props) {
+  const { reading, series, drawn, t, range, rangeLabel, color } = props;
   return (
     <>
       <section className="panel">
@@ -86,6 +123,8 @@ function ClimateHistory({ reading, series, drawn, t, range, rangeLabel, color })
         />
         <Stats values={series.hum} unit="%" digits={0} />
       </section>
+
+      {series.co2?.some((v) => v != null) && <Co2History {...props} />}
     </>
   );
 }
@@ -185,7 +224,13 @@ export default function DetailSheet({
     if (series.kind === 'power') {
       return { watts: b(series.watts), volts: b(series.volts), lo: b(series.wattsLo), hi: b(series.wattsHi) };
     }
-    return { temp: b(series.temp), hum: b(series.hum), lo: b(series.tempLo), hi: b(series.tempHi) };
+    return {
+      temp: b(series.temp),
+      hum: b(series.hum),
+      lo: b(series.tempLo),
+      hi: b(series.tempHi),
+      co2: series.co2 ? b(series.co2) : null,
+    };
   }, [series, bucketSec]);
 
   // Close on Escape, and keep focus inside the sheet while it's open.
@@ -286,6 +331,7 @@ export default function DetailSheet({
                       : [
                           { label: 'Temp °C', values: series.temp },
                           { label: 'Humidity %', values: series.hum, digits: 0 },
+                          ...(series.co2 ? [{ label: 'CO₂ ppm', values: series.co2, digits: 0 }] : []),
                         ]
                   }
                 />

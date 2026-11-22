@@ -88,3 +88,24 @@ test('long ranges keep the axis to a few hundred points', async () => {
     assert.ok(h.t.length > 100 && h.t.length < 400, `${key}: ${h.t.length} points`);
   }
 });
+
+test('CO2 history lands on the Ruuvi Air series only, and degrades on failure', async () => {
+  const { bucketSec } = RANGES['1h'];
+  const lastBucket = Math.floor(Date.now() / 1000 / bucketSec) * bucketSec;
+  answer(({ sql }) => {
+    if (/co2_hi/.test(sql)) return [{ bucket: influxTime(lastBucket * 1000), key: 'RuuviAir', co2: 640, co2_hi: 702 }];
+    return [];
+  });
+  const h = await fetchHistory('1h');
+  const air = h.series.find((s) => s.id === 'ruuvi_air');
+  assert.equal(air.co2.at(-1), 640);
+  assert.equal(air.co2Hi.at(-1), 702);
+  assert.equal(h.series.find((s) => s.id === 'office').co2, undefined);
+
+  answer(({ sql }) => {
+    if (/co2_hi/.test(sql)) throw new Error('no field named co2');
+    return [];
+  });
+  const degraded = await fetchHistory('1h');
+  assert.ok(degraded.series.find((s) => s.id === 'ruuvi_air').co2.every((v) => v == null));
+});
