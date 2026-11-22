@@ -44,7 +44,7 @@ function Timeline({ spells, startMs, endMs, unknownUntil, range }) {
 }
 
 /** When each door opened and closed over the selected range. */
-export default function DoorSheet({ reading, range, rangeLabel, onClose }) {
+export default function DoorSheet({ reading, range, end = null, rangeLabel, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
@@ -52,13 +52,13 @@ export default function DoorSheet({ reading, range, rangeLabel, onClose }) {
   useEffect(() => {
     const ac = new AbortController();
     setError(null);
-    getDoorEvents(range, ac.signal)
+    getDoorEvents(range, ac.signal, end)
       .then((d) => setData(d))
       .catch((err) => {
         if (err.name !== 'AbortError') setError(err.message);
       });
     return () => ac.abort();
-  }, [range]);
+  }, [range, end]);
 
   const door = data?.doors.find((d) => d.id === reading.id);
   const startMs = (data?.start ?? 0) * 1000;

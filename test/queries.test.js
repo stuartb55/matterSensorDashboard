@@ -171,3 +171,22 @@ test('the daily preset is internal: not a button and not a public range', async 
   assert.equal(h.bucketSec, 3600);
   assert.equal(h.t.length, 31 * 24 + 1);
 });
+
+test('a past window ends at the given time and puts only ISO timestamps into SQL', async () => {
+  const { parseEnd } = await import('../server/queries.js');
+  const now = Math.floor(Date.now() / 1000);
+  assert.equal(parseEnd(undefined), null);
+  assert.equal(parseEnd(String(now + 3600)), null, 'a future end means now');
+  assert.equal(parseEnd(String(now - 86400)), now - 86400);
+  for (const bad of ['abc', '1.5', "1; DROP TABLE x", String(now - 500 * 86400)]) {
+    assert.throws(() => parseEnd(bad), /end must be/);
+  }
+
+  const end = Math.floor(Date.UTC(2026, 10, 1) / 1000);
+  answer(() => []);
+  const h = await fetchHistory('24h', ['office'], end);
+  assert.equal(h.end, end);
+  assert.equal(h.t.at(-1), end);
+  assert.ok(sent.some(({ sql }) => sql.includes("time > '2026-10-31T00:00:00.000Z' AND time <= '2026-11-01T00:00:00.000Z'")));
+  assert.ok(!sent.some(({ sql }) => sql.includes('now()')));
+});

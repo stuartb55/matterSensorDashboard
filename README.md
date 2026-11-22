@@ -166,8 +166,8 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /health` | Process status and InfluxDB reachability |
 | `GET /api/sensors` | Sensor registry |
 | `GET /api/readings/latest` | Current reading per sensor plus per-feed health, 10s server-side cache |
-| `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
-| `GET /api/doors/events?range=24h` | Each door's state at the start of the range and every change in it |
+| `GET /api/history?range=24h&sensors=a,b&end=…` | Bucketed series on a shared time axis; `end` (epoch seconds, optional) ends the window in the past |
+| `GET /api/doors/events?range=24h&end=…` | Each door's state at the start of the range and every change in it |
 | `GET /api/floorplan` | Floor layouts and sensor positions |
 | `GET /api/weather` | Outdoor temperature and humidity from Open-Meteo, 15 min cache |
 | `GET /api/daily` | 31 days of hourly buckets for calendar-day views, plus the energy tariff, 10 min cache |
