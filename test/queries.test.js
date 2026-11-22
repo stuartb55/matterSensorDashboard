@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { answer, influxTime, sent } from './influx-mock.js';
 
-const { parseInfluxTime, fetchHistory, fetchLatest, publicRanges, RANGES } = await import(
+const { parseInfluxTime, fetchHistory, fetchLatest, publicRanges, RANGES, timeChunks, timeWindow, CHUNK_SEC } = await import(
   '../server/queries.js'
 );
 
@@ -43,6 +43,69 @@ test('fetchHistory pads every series to a shared epoch-anchored axis with nulls'
   assert.equal(office.temp[0], null);
   assert.ok(!h.series.some((s) => s.kind === 'door'), 'doors stay out of the history contract');
   assert.ok(sent.every(({ sql }) => !/;/.test(sql)));
+});
+
+const bounds = (clause) => [...clause.matchAll(/time (>=?|<=?) '([^']+)'/g)].map(([, op, iso]) => [op, Date.parse(iso) / 1000]);
+
+test('timeChunks keeps a week or less as the single timeWindow condition', () => {
+  for (const range of ['1h', '24h', '7d']) {
+    assert.deepEqual(timeChunks(range), [timeWindow(range).clause]);
+    assert.deepEqual(timeChunks(range, 1_790_000_000), [timeWindow(range, 1_790_000_000).clause]);
+  }
+});
+
+test('timeChunks cuts long ranges into contiguous, half-open, week-aligned pieces', () => {
+  for (const range of ['30d', '90d', '1y', 'daily']) {
+    const end = 1_790_000_123;
+    const { spanSec, bucketSec } = RANGES[range];
+    assert.equal(CHUNK_SEC % bucketSec, 0, `${range} buckets divide a week`);
+    const chunks = timeChunks(range, end).map(bounds);
+    assert.ok(chunks.length >= Math.ceil(spanSec / CHUNK_SEC));
+    assert.deepEqual(chunks[0][0], ['>', end - spanSec]);
+    assert.deepEqual(chunks.at(-1).at(-1), ['<=', end]);
+    for (let i = 1; i < chunks.length; i += 1) {
+      const [prevOp, prevHi] = chunks[i - 1][1];
+      const [op, lo] = chunks[i][0];
+      assert.equal(prevOp, '<');
+      assert.equal(op, '>=');
+      assert.equal(lo, prevHi, 'no gap or overlap between pieces');
+      assert.equal(lo % CHUNK_SEC, 0, 'boundaries sit on epoch-aligned weeks');
+    }
+  }
+});
+
+test('timeChunks leaves the newest piece open-ended when the range ends now', () => {
+  const chunks = timeChunks('30d');
+  assert.equal(bounds(chunks.at(-1)).length, 1);
+  assert.equal(bounds(chunks.at(-1))[0][0], '>=');
+});
+
+test('fetchHistory reads long ranges a piece at a time and joins the rows', async () => {
+  const { bucketSec } = RANGES['90d'];
+  const end = Math.floor(Date.now() / 1000) - 86400;
+  const first = Math.floor((end - RANGES['90d'].spanSec) / bucketSec) * bucketSec + bucketSec;
+  const last = Math.floor(end / bucketSec) * bucketSec;
+  let inFlight = 0;
+  let maxInFlight = 0;
+  answer(async ({ db, sql }) => {
+    if (!(db === 'ruuvi' && /temp_lo/.test(sql))) return [];
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((r) => setTimeout(r, 1));
+    inFlight -= 1;
+    const [[, lo], [, hi]] = bounds(sql);
+    return [first, last]
+      .filter((b) => b >= lo && b < hi + 1)
+      .map((b) => ({ bucket: influxTime(b * 1000), key: 'Office', temp: b === first ? 18 : 22 }));
+  });
+
+  const h = await fetchHistory('90d', null, end);
+  const pieces = sent.filter(({ db, sql }) => db === 'ruuvi' && /temp_lo/.test(sql));
+  assert.equal(pieces.length, timeChunks('90d', end).length);
+  assert.equal(maxInFlight, 1, 'pieces run one after another');
+  const office = h.series.find((s) => s.id === 'office');
+  assert.equal(office.temp[h.t.indexOf(first)], 18);
+  assert.equal(office.temp[h.t.indexOf(last)], 22);
 });
 
 test('fetchHistory rejects unknown ranges', async () => {

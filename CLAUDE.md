@@ -155,6 +155,12 @@ the live database.
   exist, and degrade to nulls on failure, like CO2. Energy used over a range is
   the rise in the cumulative counter (resets count as zero), falling back to
   integrated average power, flagged as an estimate.
+- **Long history is read a week at a time.** InfluxDB cannot spill a sort to
+  disk, so 30 days or more of once-a-second Ruuvi rows in one statement fails
+  with "Memory Exhausted while Sorting". `timeChunks()` cuts ranges over a week
+  into epoch-aligned, half-open week pieces (a week divides every preset's
+  bucket), and `queryChunked()` runs them one after another. New bucketed
+  history queries over long ranges should go through it.
 - **Hot Water is `kind: "equipment"`** — it sits near 47 °C and must stay off any
   shared room scale, or every room curve flattens.
 
