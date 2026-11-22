@@ -11,6 +11,26 @@ export const RANGES = {
   '24h': { label: '24H', interval: '24 hours', bucket: '5 minutes', bucketSec: 300, spanSec: 24 * 3600 },
   '7d': { label: '7D', interval: '7 days', bucket: '30 minutes', bucketSec: 1800, spanSec: 7 * 86400 },
   '30d': { label: '30D', interval: '30 days', bucket: '3 hours', bucketSec: 10800, spanSec: 30 * 86400 },
+  // Long ranges scan far more rows (Ruuvi tags broadcast about once a
+  // second), so they get more time before the query is abandoned. How far back
+  // they reach depends on the database's retention; a series simply starts
+  // partway along the axis where data runs out, as Matter already does.
+  '90d': {
+    label: '90D',
+    interval: '90 days',
+    bucket: '12 hours',
+    bucketSec: 43200,
+    spanSec: 90 * 86400,
+    timeoutMs: 45_000,
+  },
+  '1y': {
+    label: '1Y',
+    interval: '365 days',
+    bucket: '1 day',
+    bucketSec: 86400,
+    spanSec: 365 * 86400,
+    timeoutMs: 60_000,
+  },
 };
 
 /** The public shape of the range presets, in button order. */
@@ -324,7 +344,7 @@ async function historyForSource(source, sensors, range) {
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
     GROUP BY bucket, ${src.tag}
     ORDER BY bucket`;
-  return query(src.db, sql);
+  return query(src.db, sql, { timeoutMs: RANGES[range].timeoutMs });
 }
 
 /**
@@ -359,7 +379,7 @@ async function historyForPower(sensors, range) {
         AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
       GROUP BY bucket, ${src.tag}
       ORDER BY bucket`;
-    const rows = await query(src.db, sql);
+    const rows = await query(src.db, sql, { timeoutMs: RANGES[range].timeoutMs });
     return rows.map((row) => {
       const out = { bucket: row.bucket, key: row.key };
       for (const [alias, , field] of aggs) out[alias] = scaled(row[alias], present.get(field));
