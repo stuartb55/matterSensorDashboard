@@ -7,3 +7,6 @@ web/dist/
 
 # Real floor plan: identifies the house, so it stays on the host only.
 /floorplan/
+
+# Host-specific sensor list (optional), mounted read-only like the floor plan.
+/config/

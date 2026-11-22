@@ -59,7 +59,10 @@ at startup if neither is set.
 two upstream schemas) and `SENSORS` (twelve devices). Everything else — SQL
 generation, response shaping, staleness, battery units, the public `/api/sensors`
 payload — derives from it. Adding a sensor from an existing source is a one-line
-change there and nothing else. `publicRegistry()` is the boundary that keeps
+change there and nothing else. On the host, `config/sensors.json`
+(`CONFIG_DIR`, mounted read-only) replaces `DEFAULT_SENSORS` wholesale at
+startup; `validateSensors()` keeps only known fields and refuses the whole file
+on any problem, so nothing from it reaches SQL unchecked. `publicRegistry()` is the boundary that keeps
 database names and column names off the wire.
 
 **The browser never sends SQL.** `server/queries.js` builds every statement from

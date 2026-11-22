@@ -37,6 +37,9 @@ services:
     # gitignored. Without it the generic example plan is shown.
     volumes:
       - ./floorplan:/app/floorplan:ro
+      # Optional sensors.json replacing the built-in sensor list, so adding a
+      # sensor needs no rebuild. Read at startup: restart after editing it.
+      - ./config:/app/config:ro
 
     networks:
       - influxdb

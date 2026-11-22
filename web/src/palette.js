@@ -19,6 +19,16 @@ const SLOT_BY_ID = {
   network_power: 1,
 };
 
+/**
+ * Slots set in the server's sensors.json (`slot: 1-8`) for sensors the
+ * built-in table doesn't know. Called once the registry has loaded.
+ */
+export function registerSlots(sensors) {
+  for (const s of sensors ?? []) {
+    if (s.slot) SLOT_BY_ID[s.id] = s.slot;
+  }
+}
+
 /** Resolve a sensor's series colour to a concrete hex for canvas drawing. */
 export function seriesColor(id, styles) {
   const slot = SLOT_BY_ID[id] ?? 1;
