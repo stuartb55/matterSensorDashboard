@@ -119,6 +119,16 @@ as unreachable rather than off. Each Hue room can also go on the floor plan:
 it appears in **Edit positions** as "<room> lights" and is stored in
 `floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
 
+## Energy
+
+The power meter's detail sheet shows **Daily use**: kWh per local calendar
+day for the last 30 days, today's, the week's and the month's totals, and the
+always-on draw (the quietest hours of the last week) with what it adds up to
+over a year. Daily figures come from the meter's lifetime counter, so nothing
+is lost between buckets; where the counter is missing they are estimated from
+average power and marked ≈. Set `ENERGY_PRICE` (per kWh) and optionally
+`ENERGY_CURRENCY` in `.env` to see costs.
+
 ## Outdoor weather
 
 With `WEATHER_LAT` and `WEATHER_LON` set in `.env`, the server reads outdoor
@@ -160,6 +170,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/doors/events?range=24h` | Each door's state at the start of the range and every change in it |
 | `GET /api/floorplan` | Floor layouts and sensor positions |
 | `GET /api/weather` | Outdoor temperature and humidity from Open-Meteo, 15 min cache |
+| `GET /api/daily` | 31 days of hourly buckets for calendar-day views, plus the energy tariff, 10 min cache |
 | `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`, `1y`. The two

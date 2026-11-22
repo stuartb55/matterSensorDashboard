@@ -31,11 +31,27 @@ export const RANGES = {
     spanSec: 365 * 86400,
     timeoutMs: 60_000,
   },
+  // Not a button: 31 days of hourly buckets behind /api/daily, which the
+  // frontend regroups into local calendar days (date_bin days are UTC).
+  daily: {
+    label: 'Daily',
+    interval: '31 days',
+    bucket: '1 hour',
+    bucketSec: 3600,
+    spanSec: 31 * 86400,
+    timeoutMs: 30_000,
+    hidden: true,
+  },
 };
+
+/** Range keys a client may ask /api/history for. */
+export const isPublicRange = (key) => Boolean(RANGES[key]) && !RANGES[key].hidden;
 
 /** The public shape of the range presets, in button order. */
 export function publicRanges() {
-  return Object.entries(RANGES).map(([key, { label, spanSec }]) => ({ key, label, spanSec }));
+  return Object.entries(RANGES)
+    .filter(([key]) => isPublicRange(key))
+    .map(([key, { label, spanSec }]) => ({ key, label, spanSec }));
 }
 
 export const DEFAULT_RANGE = '24h';

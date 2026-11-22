@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getFloorplan, getHistory, getLatest, getLights, getSensors, getWeather } from './api.js';
+import { getFloorplan, getHistory, getLatest, getLights, getDaily, getSensors, getWeather } from './api.js';
 import { fmtAge, fmtDuration, fmtHum, fmtTemp } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
@@ -58,6 +58,10 @@ export default function App() {
   const [readings, setReadings] = useState(null);
   // Per-source health: which upstream feeds have gone quiet as a whole.
   const [feeds, setFeeds] = useState([]);
+  // Thirty-one days of hourly buckets for calendar-day views, fetched when a
+  // detail sheet opens and reused for ten minutes.
+  const [daily, setDaily] = useState(null);
+  const dailyAt = useRef(0);
   // Outdoor reference, or null when no location is configured.
   const [weather, setWeather] = useState(null);
   const [history, setHistory] = useState(null);
@@ -198,6 +202,20 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [loadLatest, loadHistory]);
+
+  useEffect(() => {
+    if (!selected || Date.now() - dailyAt.current < 10 * 60_000) return;
+    const ac = new AbortController();
+    getDaily(ac.signal)
+      .then((data) => {
+        dailyAt.current = Date.now();
+        setDaily(data);
+      })
+      .catch(() => {
+        /* calendar-day panels are extras; the sheet works without them */
+      });
+    return () => ac.abort();
+  }, [selected]);
 
   const seriesById = useMemo(() => {
     const map = new Map();
@@ -436,6 +454,7 @@ export default function App() {
           bucketSec={history?.bucketSec}
           range={range}
           rangeLabel={rangeLabel}
+          daily={daily}
           onClose={() => setSelected(null)}
         />
       )}
