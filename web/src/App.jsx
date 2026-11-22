@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getFloorplan, getHistory, getLatest, getLights, getSensors } from './api.js';
-import { fmtAge, fmtDuration } from './format.js';
+import { getFloorplan, getHistory, getLatest, getLights, getSensors, getWeather } from './api.js';
+import { fmtAge, fmtDuration, fmtHum, fmtTemp } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
 import PowerCard from './components/PowerCard.jsx';
 import LightCard from './components/LightCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
+import OutsideChart from './components/OutsideChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 import DoorSheet from './components/DoorSheet.jsx';
 import FloorPlan from './components/FloorPlan.jsx';
@@ -57,6 +58,8 @@ export default function App() {
   const [readings, setReadings] = useState(null);
   // Per-source health: which upstream feeds have gone quiet as a whole.
   const [feeds, setFeeds] = useState([]);
+  // Outdoor reference, or null when no location is configured.
+  const [weather, setWeather] = useState(null);
   const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
   const [refetching, setRefetching] = useState(false);
@@ -103,7 +106,19 @@ export default function App() {
     }
   }, [loadLights]);
 
+  // Weather rides along with history; the server caches it for 15 minutes,
+  // and a failure just leaves the outdoor reference out.
+  const loadWeather = useCallback(async (signal) => {
+    try {
+      const data = await getWeather(signal);
+      setWeather(data.enabled ? data : null);
+    } catch {
+      /* outdoor reference is optional */
+    }
+  }, []);
+
   const loadHistory = useCallback(async (forRange, signal) => {
+    loadWeather(signal);
     try {
       const data = await getHistory(forRange, null, signal);
       // Discard if the user switched range while this was in flight.
@@ -113,7 +128,7 @@ export default function App() {
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
     }
-  }, []);
+  }, [loadWeather]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -220,13 +235,21 @@ export default function App() {
     <div className="app">
       <header className="masthead">
         <h1>Home Climate</h1>
-        <p className="status">
-          <span
-            className={`dot${error ? ' bad' : offline ? ' warn' : ''}`}
-            aria-hidden="true"
-          />
-          {error ? 'Connection lost' : readings ? `Updated ${fmtAge(freshest)}` : 'Loading…'}
-        </p>
+        <div className="masthead-meta">
+          <p className="status">
+            <span
+              className={`dot${error ? ' bad' : offline ? ' warn' : ''}`}
+              aria-hidden="true"
+            />
+            {error ? 'Connection lost' : readings ? `Updated ${fmtAge(freshest)}` : 'Loading…'}
+          </p>
+          {weather?.current?.tempC != null && (
+            <p className="status outside">
+              Outside {fmtTemp(weather.current.tempC)}°
+              {weather.current.humidity != null && ` · ${fmtHum(weather.current.humidity)}%`}
+            </p>
+          )}
+        </div>
       </header>
 
       {error && (
@@ -380,6 +403,14 @@ export default function App() {
                 t={history.t}
                 series={history.series}
                 bucketSec={history.bucketSec}
+                range={range}
+                rangeLabel={rangeLabel}
+              />
+              <OutsideChart
+                t={history.t}
+                series={history.series}
+                bucketSec={history.bucketSec}
+                weather={weather}
                 range={range}
                 rangeLabel={rangeLabel}
               />

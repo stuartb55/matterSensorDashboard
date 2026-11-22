@@ -88,6 +88,7 @@ export default function TimeChart({
         label: s.label,
         stroke: s.color,
         width: 2, // 2px line, round join/cap
+        ...(s.dash ? { dash: s.dash } : {}),
         // A reading with no neighbour on either side has no line to sit on,
         // so it is drawn as a dot; otherwise a sparse series (a meter that
         // only reports on change) renders as an empty plot.

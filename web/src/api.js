@@ -33,3 +33,5 @@ export const getLights = (signal) => getJson('/api/lights', signal);
 
 export const getDoorEvents = (range, signal) =>
   getJson(`/api/doors/events?${new URLSearchParams({ range })}`, signal);
+
+export const getWeather = (signal) => getJson('/api/weather', signal);

@@ -1131,3 +1131,23 @@ button.door-card:active {
   paint-order: stroke;
   stroke-linejoin: round;
 }
+
+/* ----------------------------------------------------------- outdoor ref */
+
+.masthead-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.masthead .status.outside {
+  font-variant-numeric: tabular-nums;
+}
+.legend-key.is-dashed {
+  height: 0;
+  border-top: 2px dashed currentColor;
+  border-radius: 0;
+}
+.masthead-meta .status {
+  margin: 0;
+}
