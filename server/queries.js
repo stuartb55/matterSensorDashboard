@@ -118,7 +118,7 @@ const isoSec = (sec) => new Date(sec * 1000).toISOString();
  * clock) or at a fixed past instant. `after` is the window's open start, also
  * used to look up the state in force before it.
  */
-function timeWindow(range, endSec = null) {
+export function timeWindow(range, endSec = null) {
   const { interval, spanSec } = RANGES[range];
   if (endSec == null) {
     const after = `now() - INTERVAL '${interval}'`;
@@ -597,6 +597,25 @@ async function historyForPower(sensors, range, endSec) {
   }
 }
 
+/**
+ * The shared time axis for a range: evenly spaced bucket starts anchored to
+ * the epoch, as date_bin anchors them, plus a lookup from a bucket's start
+ * (epoch seconds) to its index, or -1 when it falls outside the axis.
+ */
+export function bucketAxis(range, endSec = null) {
+  const { bucketSec, spanSec } = RANGES[range];
+  const nowSec = endSec ?? Math.floor(Date.now() / 1000);
+  const lastBucket = Math.floor(nowSec / bucketSec) * bucketSec;
+  const firstBucket = Math.floor((nowSec - spanSec) / bucketSec) * bucketSec;
+  const count = Math.round((lastBucket - firstBucket) / bucketSec) + 1;
+  const t = Array.from({ length: count }, (_, i) => firstBucket + i * bucketSec);
+  const indexOf = (sec) => {
+    const i = Math.round((sec - firstBucket) / bucketSec);
+    return i >= 0 && i < count ? i : -1;
+  };
+  return { t, count, indexOf };
+}
+
 const hasNoBattery = (sensor) => Boolean(sensor.noBattery);
 
 /**
@@ -608,7 +627,7 @@ const hasNoBattery = (sensor) => Boolean(sensor.noBattery);
  */
 export async function fetchHistory(range = DEFAULT_RANGE, ids = null, endSec = null) {
   if (!RANGES[range]) throw new Error(`unknown range: ${range}`);
-  const { bucketSec, spanSec } = RANGES[range];
+  const { bucketSec } = RANGES[range];
 
   // Contact state changes are discrete events, not a temperature/humidity
   // series. Keeping doors out of this contract avoids presenting null charts.
@@ -624,17 +643,7 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null, endSec = n
     historyForCo2(climate.filter((s) => s.source === 'ruuvi' && s.hasCo2), range, endSec),
   ]);
 
-  // date_bin anchors buckets to the epoch, so the axis is built the same way.
-  const nowSec = endSec ?? Math.floor(Date.now() / 1000);
-  const lastBucket = Math.floor(nowSec / bucketSec) * bucketSec;
-  const firstBucket = Math.floor((nowSec - spanSec) / bucketSec) * bucketSec;
-  const count = Math.round((lastBucket - firstBucket) / bucketSec) + 1;
-
-  const t = Array.from({ length: count }, (_, i) => firstBucket + i * bucketSec);
-  const indexOf = (sec) => {
-    const i = Math.round((sec - firstBucket) / bucketSec);
-    return i >= 0 && i < count ? i : -1;
-  };
+  const { t, count, indexOf } = bucketAxis(range, endSec);
 
   const empty = () => new Array(count).fill(null);
   const series = new Map(

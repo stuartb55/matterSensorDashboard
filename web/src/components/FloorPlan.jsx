@@ -409,8 +409,8 @@ export default function FloorPlan({ plan, readings, onOpen, readOnly = false }) 
                 </div>
               );
             }
-            // Lights have no history, so they have nothing to open.
-            if (r.kind === 'lights') {
+            // Lights open their history only where the server records it.
+            if (r.kind === 'lights' && !r.history) {
               return (
                 <div key={id} className={className} style={style} aria-label={`${r.label}: ${spoken}${status}`}>
                   {body}

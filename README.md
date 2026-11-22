@@ -131,8 +131,8 @@ replaces the built-in list entirely:
 
 Philips Hue lights are read live from the Hue Bridge's local API and shown
 view-only: one card per room set up in the Hue app, with each bulb's on/off
-state and brightness. Nothing is written to the bridge. Lights skip InfluxDB, so
-there is no history, only what is on now.
+state and brightness. Nothing is written to the bridge, so there is no light
+control.
 
 Set two values in `.env` (see `.env.example`):
 
@@ -146,6 +146,28 @@ Without them the Lights section is hidden. A bulb switched off at the wall shows
 as unreachable rather than off. Each Hue room can also go on the floor plan:
 it appears in **Edit positions** as "<room> lights" and is stored in
 `floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
+
+### Light history
+
+The bridge only knows what is on now. To look back, the server can record each
+Hue room's state into InfluxDB once a minute: how many lights are on, how many
+there are, how many are unreachable and the average brightness, one row per
+room in table `hue_rooms`. Each Lights card then gets a **History** link (as
+does the room's floor plan marker) opening a chart of how much of each
+interval the room had a light on, with total time on over the selected range.
+
+This is the only thing the dashboard writes to InfluxDB, so it uses its own
+token and its own database, leaving the main token read-only:
+
+- `HUE_HISTORY_TOKEN`: a token that can write and read the history database.
+- `HUE_HISTORY_DB` (optional): the database name, `hue` by default.
+
+Create both with the InfluxDB 3 CLI, for example
+`influxdb3 create database hue` and then a token with read and write
+permission on that database (or an admin token on InfluxDB 3 Core, which has
+no per-database tokens). Without `HUE_HISTORY_TOKEN` nothing is recorded and
+the History links don't appear. History starts when recording starts; a gap in
+recording shows as a gap, never as "off".
 
 ## Wall display
 

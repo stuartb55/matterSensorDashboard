@@ -10,6 +10,7 @@ import CompareChart from './components/CompareChart.jsx';
 import OutsideChart from './components/OutsideChart.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 import DoorSheet from './components/DoorSheet.jsx';
+import LightSheet from './components/LightSheet.jsx';
 import FloorPlan from './components/FloorPlan.jsx';
 
 const LATEST_POLL_MS = 30_000;
@@ -183,6 +184,8 @@ export default function App() {
   // True once the server has said the bridge is configured but not answering.
   // Lets the section appear with a notice even before any lights have loaded.
   const [lightsDown, setLightsDown] = useState(false);
+  // Whether the server records light history, so light cards can open it.
+  const [lightsHistory, setLightsHistory] = useState(false);
 
   // Keyed by range so a stale in-flight response can't overwrite a newer one.
   // A past day to look at instead of "now": the window then ends at the close
@@ -201,6 +204,7 @@ export default function App() {
     try {
       const data = await getLights(signal);
       setLights(data.enabled ? data.rooms : null);
+      setLightsHistory(Boolean(data.enabled && data.history));
       setLightsError(null);
       setLightsDown(false);
     } catch (err) {
@@ -357,7 +361,9 @@ export default function App() {
     ...l,
     label: `${l.label} lights`,
     stale: Boolean(lightsError),
+    history: lightsHistory,
   }));
+  const selectedLight = lightRooms.find((l) => l.id === selected) ?? null;
   const planItems = readings ? [...readings, ...lightRooms] : readings;
 
   const freshest = readings?.reduce(
@@ -477,7 +483,11 @@ export default function App() {
               {lights?.length > 0 ? (
                 <div className={`grid${lightsError ? ' is-stale-group' : ''}`}>
                   {lights.map((room) => (
-                    <LightCard key={room.id} room={room} />
+                    <LightCard
+                      key={room.id}
+                      room={room}
+                      onOpen={lightsHistory && !wall ? setSelected : null}
+                    />
                   ))}
                 </div>
               ) : (
@@ -596,6 +606,16 @@ export default function App() {
       {selectedReading?.kind === 'door' && (
         <DoorSheet
           reading={selectedReading}
+          range={range}
+          end={end}
+          rangeLabel={rangeLabel}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      {selectedLight && lightsHistory && (
+        <LightSheet
+          room={selectedLight}
           range={range}
           end={end}
           rangeLabel={rangeLabel}

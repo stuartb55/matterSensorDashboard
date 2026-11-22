@@ -21,6 +21,7 @@ import { publicRegistry, SENSORS, SENSORS_FROM } from './sensors.js';
 import { floorplan } from './floorplan.js';
 import { fetchLights, HueError } from './hue.js';
 import { fetchWeather, WeatherError } from './weather.js';
+import { fetchLightHistory, lightHistoryEnabled, startRecorder } from './hue-history.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -115,13 +116,35 @@ async function cachedLights() {
 
 app.get('/api/lights', async (_req, reply) => {
   try {
-    return { ...(await cachedLights()), fetchedAt: Date.now() };
+    return { ...(await cachedLights()), history: lightHistoryEnabled, fetchedAt: Date.now() };
   } catch (err) {
     app.log.error({ err: err.message }, 'hue bridge request failed');
     const status = err instanceof HueError ? err.status : 500;
     return reply.code(status).send({ error: 'hue_unavailable', message: err.message });
   }
 });
+
+// Light states recorded by the server itself (see hue-history.js). Off, with
+// `enabled: false`, unless Hue and HUE_HISTORY_TOKEN are both configured.
+app.get('/api/lights/history', async (req, reply) => {
+  const range = String(req.query.range || DEFAULT_RANGE);
+  if (!isPublicRange(range)) {
+    return reply.code(400).send({ error: 'bad_range', allowed: publicRanges().map((r) => r.key) });
+  }
+  let end;
+  try {
+    end = parseEnd(req.query.end);
+  } catch (err) {
+    return reply.code(400).send({ error: 'bad_end', message: err.message });
+  }
+  try {
+    return await fetchLightHistory(range, end);
+  } catch (err) {
+    return sendUpstreamError(reply, err, app.log);
+  }
+});
+
+startRecorder(cachedLights, app.log);
 
 // Outdoor reference from Open-Meteo; cached inside weather.js for 15 minutes.
 app.get('/api/weather', async (_req, reply) => {
