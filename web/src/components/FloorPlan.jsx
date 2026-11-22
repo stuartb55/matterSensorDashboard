@@ -106,7 +106,7 @@ function describe(r) {
  * exports the result as `floorplan.json` for the host's floorplan folder; the
  * server only ever reads that file, so nothing is saved from the browser.
  */
-export default function FloorPlan({ plan, readings, onOpen }) {
+export default function FloorPlan({ plan, readings, onOpen, readOnly = false }) {
   const [floorId, setFloorId] = useState(plan.floors[0]?.id);
   const [editing, setEditing] = useState(false);
   const [placing, setPlacing] = useState(null);
@@ -249,14 +249,16 @@ export default function FloorPlan({ plan, readings, onOpen }) {
         ) : (
           <p className="panel-title">{floor.label}</p>
         )}
-        <button
-          type="button"
-          className="link-btn"
-          aria-pressed={editing}
-          onClick={() => (editing ? finishEditing() : setEditing(true))}
-        >
-          {editing ? 'Done' : 'Edit positions'}
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="link-btn"
+            aria-pressed={editing}
+            onClick={() => (editing ? finishEditing() : setEditing(true))}
+          >
+            {editing ? 'Done' : 'Edit positions'}
+          </button>
+        )}
       </div>
 
       {!editing && (

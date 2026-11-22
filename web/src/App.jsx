@@ -84,7 +84,81 @@ function OfflineNote({ count }) {
   );
 }
 
+/** `?wall` in the address turns the page into a wall display, so a tablet can bookmark it. */
+const isWallUrl = () => new URLSearchParams(window.location.search).has('wall');
+
+function setWallUrl(on) {
+  const url = new URL(window.location.href);
+  if (on) url.searchParams.set('wall', '');
+  else url.searchParams.delete('wall');
+  window.history.replaceState(null, '', url.toString().replace('wall=', 'wall'));
+}
+
+/**
+ * Keep the screen on while the wall display is showing. The browser drops the
+ * lock whenever the page is hidden, so it is asked for again on return.
+ */
+function useWakeLock(active) {
+  useEffect(() => {
+    if (!active || !('wakeLock' in navigator)) return undefined;
+    let lock = null;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        lock = await navigator.wakeLock.request('screen');
+      } catch {
+        /* refused (battery saver, say): the screen just sleeps as usual */
+      }
+    };
+    const onVisibility = () => {
+      if (!document.hidden && !cancelled) acquire();
+    };
+    acquire();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      lock?.release().catch(() => {});
+    };
+  }, [active]);
+}
+
+/** A large clock for the wall display, ticking on the minute. */
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    let timer;
+    const tick = () => {
+      setNow(new Date());
+      timer = setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+    };
+    timer = setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <p className="wall-clock">
+      <time dateTime={now.toISOString()}>
+        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </time>
+      <span>{now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+    </p>
+  );
+}
+
+// A wall display runs for weeks; reloading twice a day picks up new builds.
+const WALL_RELOAD_MS = 12 * 3600_000;
+
 export default function App() {
+  const [wall, setWall] = useState(isWallUrl);
+  useWakeLock(wall);
+  useEffect(() => {
+    setWallUrl(wall);
+    document.documentElement.classList.toggle('is-wall', wall);
+    if (!wall) return undefined;
+    const timer = setTimeout(() => window.location.reload(), WALL_RELOAD_MS);
+    return () => clearTimeout(timer);
+  }, [wall]);
+
   const [range, setRange] = useState('24h');
   // Range presets come from the server, the only place they are defined.
   const [ranges, setRanges] = useState([]);
@@ -294,7 +368,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="masthead">
-        <h1>Home Climate</h1>
+        {wall ? <Clock /> : <h1>Home Climate</h1>}
         <div className="masthead-meta">
           <p className="status">
             <span
@@ -325,35 +399,38 @@ export default function App() {
 
       {!error && <FeedNotice feeds={feeds} />}
 
-      {/* One filter row, above everything it scopes. */}
-      <div className="filters" role="group" aria-label="Time range">
-        {ranges.map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            className="range-btn"
-            aria-pressed={range === r.key}
-            onClick={() => setRange(r.key)}
-          >
-            {r.label}
-          </button>
-        ))}
-        <label className={`range-btn date-pick${day ? ' is-set' : ''}`}>
-          <span>{day ? `To ${fmtDayLabel(day)}` : 'Pick a day'}</span>
-          <input
-            type="date"
-            aria-label="Show the range ending on this day"
-            value={day ?? ''}
-            max={todayKey()}
-            onChange={(e) => setDay(e.target.value && e.target.value < todayKey() ? e.target.value : null)}
-          />
-        </label>
-        {day && (
-          <button type="button" className="range-btn" onClick={() => setDay(null)}>
-            Back to now
-          </button>
-        )}
-      </div>
+      {/* One filter row, above everything it scopes. The wall display always
+          shows the default range, so it has none. */}
+      {!wall && (
+        <div className="filters" role="group" aria-label="Time range">
+          {ranges.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              className="range-btn"
+              aria-pressed={range === r.key}
+              onClick={() => setRange(r.key)}
+            >
+              {r.label}
+            </button>
+          ))}
+          <label className={`range-btn date-pick${day ? ' is-set' : ''}`}>
+            <span>{day ? `To ${fmtDayLabel(day)}` : 'Pick a day'}</span>
+            <input
+              type="date"
+              aria-label="Show the range ending on this day"
+              value={day ?? ''}
+              max={todayKey()}
+              onChange={(e) => setDay(e.target.value && e.target.value < todayKey() ? e.target.value : null)}
+            />
+          </label>
+          {day && (
+            <button type="button" className="range-btn" onClick={() => setDay(null)}>
+              Back to now
+            </button>
+          )}
+        </div>
+      )}
 
       {!readings ? (
         <p className="empty">{error ? 'No readings available.' : 'Loading sensors…'}</p>
@@ -365,7 +442,7 @@ export default function App() {
                 <h2>Floor plan</h2>
                 <OfflineNote count={offline} />
               </div>
-              <FloorPlan plan={plan} readings={planItems} onOpen={setSelected} />
+              <FloorPlan plan={plan} readings={planItems} onOpen={setSelected} readOnly={wall} />
             </>
           )}
 
@@ -470,7 +547,7 @@ export default function App() {
             </>
           )}
 
-          {history && (
+          {history && !wall && (
             <>
               <div className="section-head">
                 <h2>Trends</h2>
@@ -494,6 +571,23 @@ export default function App() {
           )}
         </div>
       )}
+
+      <footer className="app-foot">
+        <button
+          type="button"
+          className="link-btn"
+          onClick={() => {
+            // The wall display shows the live default range.
+            if (!wall) {
+              setRange('24h');
+              setDay(null);
+            }
+            setWall(!wall);
+          }}
+        >
+          {wall ? 'Leave wall display' : 'Wall display'}
+        </button>
+      </footer>
 
       {selectedReading?.kind === 'door' && (
         <DoorSheet

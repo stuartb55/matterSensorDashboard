@@ -119,6 +119,14 @@ as unreachable rather than off. Each Hue room can also go on the floor plan:
 it appears in **Edit positions** as "<room> lights" and is stored in
 `floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
 
+## Wall display
+
+**Wall display** at the bottom of the page (or `/?wall` in the address, which a
+tablet can bookmark) turns the page into a display for a wall-mounted tablet:
+a large clock in place of the title, larger type, no range buttons, trends or
+plan editing, and the screen kept awake where the browser allows it. It
+reloads itself twice a day so it picks up new builds.
+
 ## Hot water
 
 A sensor with `heating` in the registry (Hot Water) gets a **Heating** panel:
