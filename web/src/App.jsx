@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getFloorplan, getHistory, getLatest, getLights, getSensors } from './api.js';
-import { fmtAge } from './format.js';
+import { fmtAge, fmtDuration } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
 import PowerCard from './components/PowerCard.jsx';
@@ -12,6 +12,33 @@ import FloorPlan from './components/FloorPlan.jsx';
 
 const LATEST_POLL_MS = 30_000;
 const HISTORY_POLL_MS = 120_000;
+
+/**
+ * One line per feed that has gone quiet as a whole, so an upstream outage
+ * reads as one problem with one place to look, not a page of stale cards.
+ */
+function FeedNotice({ feeds }) {
+  const down = feeds.filter((f) => f.down);
+  if (!down.length) return null;
+  return (
+    <div className="notice error" role="status">
+      <span className="dot bad" aria-hidden="true" />
+      <span>
+        {down.map((f) => (
+          <span className="feed-line" key={f.id}>
+            {f.lastSeenSec == null
+              ? `No ${f.label} readings in the last 24 hours.`
+              : `No ${f.label} readings for ${fmtDuration(f.lastSeenSec)}.`}{' '}
+            <span className="muted">
+              Every {f.label} sensor went quiet together, so check whatever collects their readings
+              and writes them to the database, not the sensors.
+            </span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
 
 function OfflineNote({ count }) {
   if (!count) return null;
@@ -28,6 +55,8 @@ export default function App() {
   // Range presets come from the server, the only place they are defined.
   const [ranges, setRanges] = useState([]);
   const [readings, setReadings] = useState(null);
+  // Per-source health: which upstream feeds have gone quiet as a whole.
+  const [feeds, setFeeds] = useState([]);
   const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
   const [refetching, setRefetching] = useState(false);
@@ -67,6 +96,7 @@ export default function App() {
     try {
       const data = await getLatest(signal);
       setReadings(data.readings);
+      setFeeds(data.feeds ?? []);
       setError(null);
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
@@ -209,6 +239,8 @@ export default function App() {
           </span>
         </div>
       )}
+
+      {!error && <FeedNotice feeds={feeds} />}
 
       {/* One filter row, above everything it scopes. */}
       <div className="filters" role="group" aria-label="Time range">

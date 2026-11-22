@@ -9,6 +9,7 @@ import {
   fetchLatest,
   fetchHistory,
   fetchDoorEvents,
+  feedHealth,
   probeUpstream,
   publicRanges,
   RANGES,
@@ -116,7 +117,8 @@ app.get('/api/lights', async (_req, reply) => {
 
 app.get('/api/readings/latest', async (_req, reply) => {
   try {
-    return { readings: await cachedLatest(), fetchedAt: Date.now() };
+    const readings = await cachedLatest();
+    return { readings, feeds: feedHealth(readings), fetchedAt: Date.now() };
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }
