@@ -119,6 +119,17 @@ as unreachable rather than off. Each Hue room can also go on the floor plan:
 it appears in **Edit positions** as "<room> lights" and is stored in
 `floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
 
+## Outdoor weather
+
+With `WEATHER_LAT` and `WEATHER_LON` set in `.env`, the server reads outdoor
+temperature and humidity from [Open-Meteo](https://open-meteo.com/) (free, no
+key) every 15 minutes. The header shows the current outdoor reading, and Trends
+adds an **Inside and outside** chart: the average of the rooms against the
+hourly outdoor temperature, on its own scale so the room comparison isn't
+flattened. Up to 92 days of outdoor history is available. Two decimal places
+of latitude and longitude (about 1 km) are plenty; the coordinates are sent
+only to Open-Meteo, never to the browser.
+
 ## CI and dependencies
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
@@ -148,6 +159,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
 | `GET /api/doors/events?range=24h` | Each door's state at the start of the range and every change in it |
 | `GET /api/floorplan` | Floor layouts and sensor positions |
+| `GET /api/weather` | Outdoor temperature and humidity from Open-Meteo, 15 min cache |
 | `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`, `1y`. The two

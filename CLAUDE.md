@@ -103,6 +103,12 @@ value is missing. Lights have no history and no detail sheet. Floor plan
 markers accept `lights:` ids by pattern, since they are not in the registry. A
 bridge failure dims the Lights section but never sets the sensor error banner.
 
+**Outdoor weather comes from Open-Meteo, not InfluxDB.** `server/weather.js`
+reads it with `WEATHER_LAT`/`WEATHER_LON` from `.env` (off when unset), keeps
+only hours already past, and caches for 15 minutes. It is a reference, not a
+sensor: it never joins the room comparison (it would flatten it), and draws in
+neutral ink, dashed, on its own Inside and outside chart.
+
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on
 `visibilitychange`, and passes slices down. Components are presentational.

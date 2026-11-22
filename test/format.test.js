@@ -58,3 +58,13 @@ test('dew point and absolute humidity match reference values', async () => {
   assert.ok(Math.abs(dewPoint(15, 100) - 15) < 1e-9);
   assert.deepEqual(dewPointSeries([20, null], [50, 40]).map((v) => v && Math.round(v)), [9, null]);
 });
+
+test('alignHourly marks each hour on short buckets and averages on long ones', async () => {
+  const { alignHourly, meanSeries } = await import('../web/src/format.js');
+  const h = 3600;
+  const hourT = [0, h, 2 * h, 3 * h];
+  const temps = [1, 2, null, 4];
+  assert.deepEqual(alignHourly([0, 60, h, h + 60, 2 * h], hourT, temps, 60), [1, null, 2, null, null]);
+  assert.deepEqual(alignHourly([0, 2 * h], hourT, temps, 2 * h), [1.5, 4]);
+  assert.deepEqual(meanSeries([[1, null, 3], [3, null, null]]), [2, null, 3]);
+});

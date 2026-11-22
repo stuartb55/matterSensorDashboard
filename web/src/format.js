@@ -235,3 +235,44 @@ export const DAMP_RH = 70;
 
 /** Element-wise dew point over two aligned series, null where either is. */
 export const dewPointSeries = (temp, hum) => temp.map((t, i) => dewPoint(t, hum[i]));
+
+/**
+ * Put an hourly series (epoch-second times) onto the history axis. Each bucket
+ * averages the hourly values that fall inside it, so on a sub-hour axis only
+ * the bucket holding each hour mark gets a value and the rest stay null, to be
+ * bridged for drawing like any slow sensor rather than drawn as steps.
+ */
+export function alignHourly(t, hourT, values, bucketSec) {
+  const byHour = new Map();
+  hourT.forEach((ts, i) => {
+    if (values[i] != null) byHour.set(ts, values[i]);
+  });
+  return t.map((start) => {
+    let sum = 0;
+    let n = 0;
+    for (let h = Math.ceil(start / 3600) * 3600; h < start + bucketSec; h += 3600) {
+      const v = byHour.get(h);
+      if (v != null) {
+        sum += v;
+        n += 1;
+      }
+    }
+    return n ? sum / n : null;
+  });
+}
+
+/** Mean across several aligned series at each index, ignoring nulls. */
+export function meanSeries(list) {
+  if (!list.length) return [];
+  return list[0].map((_, i) => {
+    let sum = 0;
+    let n = 0;
+    for (const values of list) {
+      if (values[i] != null) {
+        sum += values[i];
+        n += 1;
+      }
+    }
+    return n ? sum / n : null;
+  });
+}

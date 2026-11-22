@@ -18,6 +18,7 @@ import {
 import { publicRegistry } from './sensors.js';
 import { floorplan } from './floorplan.js';
 import { fetchLights, HueError } from './hue.js';
+import { fetchWeather, WeatherError } from './weather.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -112,6 +113,17 @@ app.get('/api/lights', async (_req, reply) => {
     app.log.error({ err: err.message }, 'hue bridge request failed');
     const status = err instanceof HueError ? err.status : 500;
     return reply.code(status).send({ error: 'hue_unavailable', message: err.message });
+  }
+});
+
+// Outdoor reference from Open-Meteo; cached inside weather.js for 15 minutes.
+app.get('/api/weather', async (_req, reply) => {
+  try {
+    return await fetchWeather();
+  } catch (err) {
+    app.log.error({ err: err.message }, 'weather request failed');
+    const status = err instanceof WeatherError ? err.status : 500;
+    return reply.code(status).send({ error: 'weather_unavailable', message: err.message });
   }
 });
 
