@@ -6,6 +6,9 @@
 
 export const SOURCES = {
   ruuvi: {
+    // Shown in the feed-down banner; the only part of a source that reaches
+    // the browser.
+    label: 'Ruuvi',
     db: 'ruuvi',
     table: 'ruuvi_measurements',
     tag: 'name',
@@ -21,6 +24,7 @@ export const SOURCES = {
     staleAfterSec: 120,
   },
   matter: {
+    label: 'Matter',
     db: 'matter',
     table: 'matter',
     tag: 'node',

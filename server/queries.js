@@ -247,6 +247,27 @@ async function latestDoorStates(sensors) {
   return query(src.db, sql);
 }
 
+/**
+ * Health of each upstream feed, judged from the latest readings. A feed is
+ * down when every sensor it carries has gone stale at once: one quiet sensor
+ * is a flat battery, all of them together is the gateway or the writer that
+ * feeds the database. Doors are left out, since a quiet door is just closed.
+ */
+export function feedHealth(readings) {
+  const now = Date.now();
+  return Object.entries(SOURCES).map(([id, src]) => {
+    const ids = new Set(sensorsForSource(id).filter((s) => s.kind !== 'door').map((s) => s.id));
+    const mine = readings.filter((r) => ids.has(r.id));
+    const newest = mine.reduce((acc, r) => (r.ts != null && (acc == null || r.ts > acc) ? r.ts : acc), null);
+    return {
+      id,
+      label: src.label,
+      lastSeenSec: newest == null ? null : Math.max(0, Math.round((now - newest) / 1000)),
+      down: mine.length > 0 && mine.every((r) => r.stale),
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Door events
 // ---------------------------------------------------------------------------

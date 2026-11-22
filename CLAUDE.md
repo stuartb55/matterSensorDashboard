@@ -71,7 +71,9 @@ only module that talks to InfluxDB. Keep that split.
 **Two databases, merged in the backend.** `ruuvi` and `matter` cannot be joined,
 so both are queried in parallel and normalised into one shape. `fetchLatest()`
 returns a row for every registered sensor, with nulls and `stale: true` for ones
-that have gone quiet — sensors never vanish from the UI.
+that have gone quiet — sensors never vanish from the UI. `feedHealth()` rides
+along in the same response: a source is `down` when every non-door sensor on
+it is stale at once, which the UI reports as one upstream problem.
 
 **The history contract.** `fetchHistory()` returns
 `{ range, bucketSec, t[], series[] }`, where `t` is an evenly spaced,

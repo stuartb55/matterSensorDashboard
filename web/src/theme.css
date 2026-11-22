@@ -1042,3 +1042,15 @@ button.door-card:active {
   color: var(--text-muted);
   font-size: 0.8rem;
 }
+
+/* ------------------------------------------------------------- feed health */
+
+.feed-line {
+  display: block;
+}
+.feed-line + .feed-line {
+  margin-top: 6px;
+}
+.notice + .filters {
+  margin-top: 12px;
+}

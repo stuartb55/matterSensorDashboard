@@ -139,3 +139,21 @@ test('door rows collapse into state changes', async () => {
   assert.equal(out.doors.find((d) => d.id === 'back_door').initial, null);
   assert.equal(out.end - out.start, 86400);
 });
+
+test('a feed is down only when every sensor on it is stale', async () => {
+  const { feedHealth } = await import('../server/queries.js');
+  const now = Date.now();
+  answer(({ db, sql }) => {
+    // Matter: one climate sensor reporting. Ruuvi: silent.
+    if (db === 'matter' && /trank = 1/.test(sql)) {
+      return [{ key: 'Kitchen', temp: 19, hum: 50, batt: 80, time: influxTime(now - 60_000) }];
+    }
+    return [];
+  });
+  const feeds = feedHealth(await fetchLatest());
+  const ruuvi = feeds.find((f) => f.id === 'ruuvi');
+  const matter = feeds.find((f) => f.id === 'matter');
+  assert.deepEqual([ruuvi.down, ruuvi.lastSeenSec, ruuvi.label], [true, null, 'Ruuvi']);
+  assert.equal(matter.down, false);
+  assert.ok(matter.lastSeenSec >= 59 && matter.lastSeenSec <= 61);
+});
