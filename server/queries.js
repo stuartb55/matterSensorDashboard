@@ -128,6 +128,56 @@ export function timeWindow(range, endSec = null) {
   return { after, clause: `time > ${after} AND time <= '${isoSec(endSec)}'` };
 }
 
+/**
+ * Longest stretch read in one history query. InfluxDB has no disk to spill a
+ * sort to, so a month or more of once-a-second Ruuvi rows in one statement
+ * fails with "Memory Exhausted while Sorting" (measured 2026-11-22: 7d fine,
+ * 30d and longer failing). A week is a whole number of every preset's buckets,
+ * and date_bin anchors buckets to the epoch, so splitting at multiples of a
+ * week never cuts a bucket in two.
+ */
+export const CHUNK_SEC = 7 * 86400;
+
+/**
+ * The time conditions that together cover a range, oldest first. A range of
+ * a week or less is one condition, exactly timeWindow()'s. A longer one is cut
+ * at epoch-aligned week boundaries into half-open pieces, so a row on a
+ * boundary is read once; the newest piece is open-ended when the range ends
+ * now, as timeWindow()'s is.
+ */
+export function timeChunks(range, endSec = null) {
+  const { spanSec } = RANGES[range];
+  if (spanSec <= CHUNK_SEC) return [timeWindow(range, endSec).clause];
+  const end = endSec ?? Math.floor(Date.now() / 1000);
+  const start = end - spanSec;
+  const clauses = [];
+  for (let lo = start; lo < end; ) {
+    const hi = Math.min((Math.floor(lo / CHUNK_SEC) + 1) * CHUNK_SEC, end);
+    const lower = lo === start ? `time > '${isoSec(lo)}'` : `time >= '${isoSec(lo)}'`;
+    let upper = ` AND time < '${isoSec(hi)}'`;
+    if (hi === end) upper = endSec == null ? '' : ` AND time <= '${isoSec(hi)}'`;
+    clauses.push(lower + upper);
+    lo = hi;
+  }
+  return clauses;
+}
+
+/**
+ * Run a bucketed history statement over each of a range's time chunks in turn
+ * and join the rows. One at a time, because running them together would ask
+ * InfluxDB for the memory the split exists to avoid. Each piece gets the
+ * range's own timeout; any failing piece fails the whole read, so a partial
+ * history is never shown as complete.
+ */
+async function queryChunked(db, range, endSec, buildSql) {
+  const { timeoutMs } = RANGES[range];
+  const rows = [];
+  for (const clause of timeChunks(range, endSec)) {
+    rows.push(...(await query(db, buildSql(clause), { timeoutMs })));
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // Latest readings
 // ---------------------------------------------------------------------------
@@ -509,7 +559,7 @@ async function historyForSource(source, sensors, range, endSec) {
   if (!sensors.length) return [];
   const src = SOURCES[source];
   const { bucket } = RANGES[range];
-  const sql = `
+  const sql = (window) => `
     SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
       ${src.tag} AS key,
       avg(${src.temp}) AS temp,
@@ -518,11 +568,11 @@ async function historyForSource(source, sensors, range, endSec) {
       avg(${src.hum}) AS hum,
       avg(${src.batt}) AS batt
     FROM ${src.table}
-    WHERE ${timeWindow(range, endSec).clause}
+    WHERE ${window}
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
     GROUP BY bucket, ${src.tag}
     ORDER BY bucket`;
-  return query(src.db, sql, { timeoutMs: RANGES[range].timeoutMs });
+  return queryChunked(src.db, range, endSec, sql);
 }
 
 /**
@@ -533,20 +583,20 @@ async function historyForSource(source, sensors, range, endSec) {
 async function historyForCo2(sensors, range, endSec) {
   if (!sensors.length) return [];
   const src = SOURCES.ruuvi;
-  const { bucket, timeoutMs } = RANGES[range];
-  const sql = `
+  const { bucket } = RANGES[range];
+  const sql = (window) => `
     SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
       ${src.tag} AS key,
       avg(${src.co2}) AS co2,
       max(${src.co2}) AS co2_hi
     FROM ${src.table}
-    WHERE ${timeWindow(range, endSec).clause}
+    WHERE ${window}
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
       AND ${src.co2} IS NOT NULL
     GROUP BY bucket, ${src.tag}
     ORDER BY bucket`;
   try {
-    return await query(src.db, sql, { timeoutMs });
+    return await queryChunked(src.db, range, endSec, sql);
   } catch (err) {
     console.warn(`CO2 history query failed: ${err.message}`);
     return [];
@@ -576,16 +626,16 @@ async function historyForPower(sensors, range, endSec) {
     const present = new Map(await powerFields());
     const aggs = POWER_AGGREGATES.filter(([, , field]) => present.has(field));
     if (!aggs.length) return [];
-    const sql = `
+    const sql = (window) => `
       SELECT date_bin(INTERVAL '${bucket}', time) AS bucket,
         ${src.tag} AS key,
         ${aggs.map(([alias, fn, field]) => `${fn}(${present.get(field).col}) AS "${alias}"`).join(',\n        ')}
       FROM ${src.table}
-      WHERE ${timeWindow(range, endSec).clause}
+      WHERE ${window}
         AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
       GROUP BY bucket, ${src.tag}
       ORDER BY bucket`;
-    const rows = await query(src.db, sql, { timeoutMs: RANGES[range].timeoutMs });
+    const rows = await queryChunked(src.db, range, endSec, sql);
     return rows.map((row) => {
       const out = { bucket: row.bucket, key: row.key };
       for (const [alias, , field] of aggs) out[alias] = scaled(row[alias], present.get(field));
