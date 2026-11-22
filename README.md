@@ -143,7 +143,9 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/floorplan` | Floor layouts and sensor positions |
 | `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
 
-Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`. No SQL reaches the
+Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`, `1y`. The two
+long ones use 12-hour and daily buckets and a longer query timeout; how far
+back they reach depends on the database's retention. No SQL reaches the
 backend from the browser.
 
 ## Things worth knowing before changing the queries

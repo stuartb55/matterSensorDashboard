@@ -80,3 +80,11 @@ test('a failing CO2 query degrades to no CO2 rather than failing everything', as
   const air = (await fetchLatest()).find((r) => r.id === 'ruuvi_air');
   assert.equal(air.co2, null);
 });
+
+test('long ranges keep the axis to a few hundred points', async () => {
+  answer(() => []);
+  for (const key of ['90d', '1y']) {
+    const h = await fetchHistory(key);
+    assert.ok(h.t.length > 100 && h.t.length < 400, `${key}: ${h.t.length} points`);
+  }
+});
