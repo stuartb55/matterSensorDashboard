@@ -27,14 +27,6 @@ export const getHistory = (range, ids, signal) => {
   return getJson(`/api/history?${params}`, signal);
 };
 
-export const RANGES = [
-  { key: '1h', label: '1H' },
-  { key: '6h', label: '6H' },
-  { key: '24h', label: '24H' },
-  { key: '7d', label: '7D' },
-  { key: '30d', label: '30D' },
-];
-
 export const getFloorplan = (signal) => getJson('/api/floorplan', signal);
 
 export const getLights = (signal) => getJson('/api/lights', signal);

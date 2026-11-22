@@ -12,18 +12,24 @@ export function fmtAge(sec) {
   return `${Math.round(h / 24)}d ago`;
 }
 
+/**
+ * Range keys are a count and a unit (`6h`, `7d`, `1y`). Anything measured in
+ * hours fits inside a day or two, so times alone identify a point on it.
+ */
+export const spansDays = (range) => !/h$/.test(range);
+
 /** Axis/tooltip time formatting, chosen by how wide the window is. */
 export function fmtTime(unixSec, range) {
   const d = new Date(unixSec * 1000);
   const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (range === '1h' || range === '6h') return time;
+  if (!spansDays(range)) return time;
   const day = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
-  return range === '24h' ? time : `${day} ${time}`;
+  return `${day} ${time}`;
 }
 
 export function fmtTick(unixSec, range) {
   const d = new Date(unixSec * 1000);
-  if (range === '7d' || range === '30d') {
+  if (spansDays(range)) {
     return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
   }
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

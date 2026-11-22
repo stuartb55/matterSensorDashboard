@@ -3,13 +3,20 @@ import { SOURCES, lookup, sensorsForSource, SENSORS } from './sensors.js';
 
 // Range presets. User input is matched against these keys only — no interval
 // string ever reaches SQL from the client.
+// `label` is what the range buttons show; the frontend reads this list from
+// /api/sensors rather than keeping its own copy.
 export const RANGES = {
-  '1h': { interval: '1 hour', bucket: '1 minute', bucketSec: 60, spanSec: 3600 },
-  '6h': { interval: '6 hours', bucket: '2 minutes', bucketSec: 120, spanSec: 6 * 3600 },
-  '24h': { interval: '24 hours', bucket: '5 minutes', bucketSec: 300, spanSec: 24 * 3600 },
-  '7d': { interval: '7 days', bucket: '30 minutes', bucketSec: 1800, spanSec: 7 * 86400 },
-  '30d': { interval: '30 days', bucket: '3 hours', bucketSec: 10800, spanSec: 30 * 86400 },
+  '1h': { label: '1H', interval: '1 hour', bucket: '1 minute', bucketSec: 60, spanSec: 3600 },
+  '6h': { label: '6H', interval: '6 hours', bucket: '2 minutes', bucketSec: 120, spanSec: 6 * 3600 },
+  '24h': { label: '24H', interval: '24 hours', bucket: '5 minutes', bucketSec: 300, spanSec: 24 * 3600 },
+  '7d': { label: '7D', interval: '7 days', bucket: '30 minutes', bucketSec: 1800, spanSec: 7 * 86400 },
+  '30d': { label: '30D', interval: '30 days', bucket: '3 hours', bucketSec: 10800, spanSec: 30 * 86400 },
 };
+
+/** The public shape of the range presets, in button order. */
+export function publicRanges() {
+  return Object.entries(RANGES).map(([key, { label, spanSec }]) => ({ key, label, spanSec }));
+}
 
 export const DEFAULT_RANGE = '24h';
 

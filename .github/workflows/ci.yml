@@ -28,9 +28,13 @@ jobs:
 
       - run: npm ci
 
+      # Unit tests run against a stand-in for InfluxDB (test/influx-mock.js),
+      # so they cover the query shaping without a database.
+      - run: npm test
+
       - run: npm run build
 
-      # There is no test suite, so this is the safety net: it boots the real
+      # Beyond the unit tests, this is the safety net: it boots the real
       # server against a closed port and asserts the behaviour that does not
       # depend on InfluxDB — the registry renders, the build is served, and an
       # unreachable upstream degrades to 503 instead of crashing the process.
@@ -52,6 +56,7 @@ jobs:
 
           echo "registry is served"
           curl -sf http://127.0.0.1:8090/api/sensors | grep -q '"living_room"'
+          curl -sf http://127.0.0.1:8090/api/sensors | grep -q '"ranges":\[{"key":"1h"'
 
           echo "built frontend is served"
           curl -sf http://127.0.0.1:8090/ | grep -q '<div id="root">'

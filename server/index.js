@@ -5,7 +5,14 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 
 import { influxUrl, InfluxError } from './influx.js';
-import { fetchLatest, fetchHistory, probeUpstream, RANGES, DEFAULT_RANGE } from './queries.js';
+import {
+  fetchLatest,
+  fetchHistory,
+  probeUpstream,
+  publicRanges,
+  RANGES,
+  DEFAULT_RANGE,
+} from './queries.js';
 import { publicRegistry } from './sensors.js';
 import { floorplan } from './floorplan.js';
 import { fetchLights, HueError } from './hue.js';
@@ -60,7 +67,11 @@ app.get('/health', async (_req, reply) => {
   }
 });
 
-app.get('/api/sensors', async () => ({ sensors: publicRegistry() }));
+app.get('/api/sensors', async () => ({
+  sensors: publicRegistry(),
+  ranges: publicRanges(),
+  defaultRange: DEFAULT_RANGE,
+}));
 
 app.get('/api/floorplan', async (_req, reply) => {
   try {

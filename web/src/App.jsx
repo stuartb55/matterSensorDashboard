@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getFloorplan, getHistory, getLatest, getLights, RANGES } from './api.js';
+import { getFloorplan, getHistory, getLatest, getLights, getSensors } from './api.js';
 import { fmtAge } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
@@ -24,6 +24,8 @@ function OfflineNote({ count }) {
 
 export default function App() {
   const [range, setRange] = useState('24h');
+  // Range presets come from the server, the only place they are defined.
+  const [ranges, setRanges] = useState([]);
   const [readings, setReadings] = useState(null);
   const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
@@ -80,6 +82,14 @@ export default function App() {
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
     }
+  }, []);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    getSensors(ac.signal)
+      .then((data) => setRanges(data.ranges ?? []))
+      .catch(() => {});
+    return () => ac.abort();
   }, []);
 
   // The plan only changes when the host's file does, so it is fetched once.
@@ -149,7 +159,7 @@ export default function App() {
     return map;
   }, [history]);
 
-  const rangeLabel = RANGES.find((r) => r.key === range)?.label.toLowerCase() ?? range;
+  const rangeLabel = ranges.find((r) => r.key === range)?.label.toLowerCase() ?? range;
   const rooms = readings?.filter((r) => r.kind === 'room') ?? [];
   const equipment = readings?.filter((r) => r.kind === 'equipment') ?? [];
   const doors = readings?.filter((r) => r.kind === 'door') ?? [];
@@ -201,7 +211,7 @@ export default function App() {
 
       {/* One filter row, above everything it scopes. */}
       <div className="filters" role="group" aria-label="Time range">
-        {RANGES.map((r) => (
+        {ranges.map((r) => (
           <button
             key={r.key}
             type="button"
