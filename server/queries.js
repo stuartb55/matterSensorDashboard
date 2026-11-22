@@ -483,6 +483,7 @@ export async function fetchLatest() {
       humidity: row?.hum ?? null,
       co2: co2.get(sensor.id) ?? null,
       hasCo2: Boolean(sensor.hasCo2),
+      heating: sensor.heating ?? null,
       battery: sensor.noBattery ? null : row?.batt ?? null,
       batteryKind: SOURCES[sensor.source].battKind,
       rssi: row?.rssi ?? null,

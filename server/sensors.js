@@ -63,7 +63,17 @@ export const SENSORS = [
   { id: 'ruuvi_air', label: 'Ruuvi Air', kind: 'room', source: 'ruuvi', key: 'RuuviAir', noBattery: true, hasCo2: true },
   // Hot water tank: sits near 47C while rooms sit near 25C. Kept out of the
   // shared room scale so it doesn't flatten every room curve.
-  { id: 'hot_water', label: 'Hot Water', kind: 'equipment', source: 'ruuvi', key: 'HotWater' },
+  // `heating` turns on reheat detection in its detail sheet: a climb of at
+  // least `minRiseC` counts as the tank being heated, and `hotC` is the
+  // temperature it should be above to be ready for use.
+  {
+    id: 'hot_water',
+    label: 'Hot Water',
+    kind: 'equipment',
+    source: 'ruuvi',
+    key: 'HotWater',
+    heating: { minRiseC: 2, hotC: 45 },
+  },
   { id: 'bathroom', label: 'Bathroom', kind: 'room', source: 'matter', key: 'Bathroom' },
   { id: 'kitchen', label: 'Kitchen', kind: 'room', source: 'matter', key: 'Kitchen' },
   { id: 'hallway', label: 'Hallway', kind: 'room', source: 'matter', key: 'Hallway' },

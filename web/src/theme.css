@@ -1249,3 +1249,10 @@ button.door-card:active {
   height: 100%;
   cursor: pointer;
 }
+.heating-list li {
+  grid-template-columns: auto 1fr auto;
+  font-size: 0.8rem;
+}
+.heating-list .event-when {
+  white-space: nowrap;
+}
