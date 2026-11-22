@@ -177,3 +177,30 @@ export function energyUsed(series, bucketSec) {
   }
   return n ? { kwh: wh / 1000, estimated: true } : null;
 }
+
+/**
+ * Seconds of the window spent at or above `level`, counting whole buckets of
+ * the raw series. Buckets with no reading count as unknown, not as below.
+ */
+export function timeAtOrAbove(values, level, bucketSec) {
+  if (!values || !bucketSec) return null;
+  let n = 0;
+  let seen = false;
+  for (const v of values) {
+    if (v == null) continue;
+    seen = true;
+    if (v >= level) n += 1;
+  }
+  return seen ? n * bucketSec : null;
+}
+
+/** "3h 20m", "45m", "0m". */
+export function fmtDuration(sec) {
+  if (sec == null) return '—';
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d}d ${h % 24}h` : `${d}d`;
+}
