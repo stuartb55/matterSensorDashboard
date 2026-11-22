@@ -48,9 +48,11 @@ export function axisValues(splits) {
 }
 
 /** Battery voltage (Ruuvi) and percentage (Matter) need different thresholds. */
+export const batteryLowMark = (kind) => (kind === 'volts' ? 2.5 : 20);
+
 export function batteryLow(value, kind) {
   if (value == null) return false;
-  return kind === 'volts' ? value < 2.5 : value < 20;
+  return value < batteryLowMark(kind);
 }
 
 export const fmtBattery = (value, kind) =>

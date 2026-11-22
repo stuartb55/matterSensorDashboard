@@ -515,7 +515,8 @@ async function historyForSource(source, sensors, range, endSec) {
       avg(${src.temp}) AS temp,
       min(${src.temp}) AS temp_lo,
       max(${src.temp}) AS temp_hi,
-      avg(${src.hum}) AS hum
+      avg(${src.hum}) AS hum,
+      avg(${src.batt}) AS batt
     FROM ${src.table}
     WHERE ${timeWindow(range, endSec).clause}
       AND ${src.tag} IN (${sqlList(sensors.map((s) => s.key))})
@@ -596,6 +597,8 @@ async function historyForPower(sensors, range, endSec) {
   }
 }
 
+const hasNoBattery = (sensor) => Boolean(sensor.noBattery);
+
 /**
  * Bucketed history on a shared, evenly spaced time axis.
  *
@@ -649,7 +652,7 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null, endSec = n
         // Meters carry electrical series; everything else is climate.
         ...(s.kind === 'power'
           ? Object.fromEntries(POWER_AGGREGATES.map(([alias]) => [alias, empty()]))
-          : { temp: empty(), tempLo: empty(), tempHi: empty(), hum: empty() }),
+          : { temp: empty(), tempLo: empty(), tempHi: empty(), hum: empty(), batt: empty() }),
         // CO2 bucket average and peak, only on sensors that measure it.
         ...(s.hasCo2 ? { co2: empty(), co2Hi: empty() } : {}),
       },
@@ -670,6 +673,7 @@ export async function fetchHistory(range = DEFAULT_RANGE, ids = null, endSec = n
       target.tempLo[i] = row.temp_lo ?? null;
       target.tempHi[i] = row.temp_hi ?? null;
       target.hum[i] = row.hum ?? null;
+      target.batt[i] = hasNoBattery(sensor) ? null : row.batt ?? null;
     }
   }
 

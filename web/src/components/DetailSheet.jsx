@@ -4,7 +4,7 @@ import TimeChart from './TimeChart.jsx';
 import TableView from './TableView.jsx';
 import DailyBars from './DailyBars.jsx';
 import DailyRange from './DailyRange.jsx';
-import { baseLoad, dailyEnergy, dailyHighLow } from '../daily.js';
+import { baseLoad, batteryForecast, dailyEnergy, dailyHighLow } from '../daily.js';
 import { heatingCycles } from '../heating.js';
 import { seriesColor } from '../palette.js';
 import {
@@ -18,6 +18,7 @@ import {
   fmtTemp,
   fmtTime,
   fmtBattery,
+  batteryLowMark,
   fmtDuration,
   summarise,
   timeAtOrAbove,
@@ -289,6 +290,47 @@ function Heating({ reading, series, t, bucketSec, range, rangeLabel }) {
   );
 }
 
+function fmtSpan(days) {
+  if (days < 1) return 'under a day';
+  if (days < 60) return `about ${Math.round(days)} days`;
+  if (days < 730) return `about ${Math.round(days / 30.4)} months`;
+  return 'more than two years';
+}
+
+/**
+ * How the battery is trending over the last month (from /api/daily) and a
+ * rough date for a change. Coin cells sag in the cold and recover, so this is
+ * a trend line through daily averages, labelled as an estimate.
+ */
+function BatteryPanel({ reading, daily }) {
+  const series = daily?.series.find((s) => s.id === reading.id);
+  const kind = reading.batteryKind;
+  const low = batteryLowMark(kind);
+  const forecast = useMemo(
+    () => (series?.batt ? batteryForecast(daily.t, series.batt, low) : null),
+    [daily, series, low],
+  );
+  if (reading.battery == null) return null;
+
+  const unit = kind === 'volts' ? ' V' : '%';
+  const perMonth = forecast ? forecast.perDay * 30.4 : null;
+  let text;
+  if (!forecast) text = 'Not enough history yet to see a trend; it needs a week.';
+  else if (forecast.steady) text = 'Steady over the last month, with no change in sight.';
+  else if (forecast.daysLeft === 0) text = `Already at the ${fmtBattery(low, kind)} mark: due a change.`;
+  else
+    text = `Falling about ${Math.abs(perMonth).toFixed(kind === 'volts' ? 3 : 1)}${unit} a month, so it should reach ${fmtBattery(low, kind)} in ${fmtSpan(forecast.daysLeft)}. A rough estimate: batteries sag in the cold and fade faster near the end.`;
+
+  return (
+    <section className="panel">
+      <h3 className="panel-title">Battery</h3>
+      <p className="panel-sub">
+        Now {fmtBattery(reading.battery, kind)}. {text}
+      </p>
+    </section>
+  );
+}
+
 function ClimateHistory(props) {
   const { reading, series, drawn, t, range, rangeLabel, color } = props;
   return (
@@ -329,6 +371,8 @@ function ClimateHistory(props) {
       {reading.heating && <Heating {...props} />}
 
       <DailyClimate reading={reading} daily={props.daily} color={color} />
+
+      <BatteryPanel reading={reading} daily={props.daily} />
 
       {reading.kind === 'room' && <Comfort {...props} />}
 

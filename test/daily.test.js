@@ -47,3 +47,16 @@ test('dailyHighLow finds each day\'s extremes and when they fell', async () => {
   assert.deepEqual(days[1].min, { value: 16, sec: start + 86400 });
   assert.equal(days[1].max, null);
 });
+
+test('batteryForecast extrapolates a falling trend and calls a flat one steady', async () => {
+  const { batteryForecast } = await import('../web/src/daily.js');
+  const start = Date.UTC(2026, 10, 1) / 1000;
+  const t = Array.from({ length: 14 * 24 }, (_, i) => start + i * 3600);
+  // 60% falling 1% a day: the last day averages 46.5%, 26.5 days above 20%.
+  const falling = t.map((sec) => 60 - (sec - start) / 86400);
+  const f = batteryForecast(t, falling, 20);
+  assert.ok(Math.abs(f.perDay + 1) < 0.01);
+  assert.ok(f.daysLeft > 25 && f.daysLeft < 28, `${f.daysLeft}`);
+  assert.equal(batteryForecast(t, t.map(() => 3.0), 2.5).steady, true);
+  assert.equal(batteryForecast(t.slice(0, 48), falling.slice(0, 48), 20), null);
+});
