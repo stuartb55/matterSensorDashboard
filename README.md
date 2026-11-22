@@ -119,6 +119,14 @@ as unreachable rather than off. Each Hue room can also go on the floor plan:
 it appears in **Edit positions** as "<room> lights" and is stored in
 `floorplan.json` under the id `lights:<room_name>` (lowercase, underscores).
 
+## Hot water
+
+A sensor with `heating` in the registry (Hot Water) gets a **Heating** panel:
+each time the tank was heated over the selected range (a climb of at least
+`minRiseC`), how far and how fast it rose, how long it sat at or above `hotC`,
+and its coolest point. It is read from the tank's own temperature, so it needs
+nothing from the boiler.
+
 ## Energy
 
 The power meter's detail sheet shows **Daily use**: kWh per local calendar

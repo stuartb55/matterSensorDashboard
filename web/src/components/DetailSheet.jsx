@@ -5,6 +5,7 @@ import TableView from './TableView.jsx';
 import DailyBars from './DailyBars.jsx';
 import DailyRange from './DailyRange.jsx';
 import { baseLoad, dailyEnergy, dailyHighLow } from '../daily.js';
+import { heatingCycles } from '../heating.js';
 import { seriesColor } from '../palette.js';
 import {
   bridgeGaps,
@@ -15,6 +16,7 @@ import {
   fmtHum,
   fmtPower,
   fmtTemp,
+  fmtTime,
   fmtBattery,
   fmtDuration,
   summarise,
@@ -231,6 +233,62 @@ function DailyClimate({ reading, daily, color }) {
   );
 }
 
+/**
+ * When a tank was heated over the selected range, read from its own
+ * temperature: each climb, how long it took, and how long the water was hot
+ * enough to use.
+ */
+function Heating({ reading, series, t, bucketSec, range, rangeLabel }) {
+  const { minRiseC, hotC } = reading.heating;
+  const cycles = useMemo(
+    () => heatingCycles(t, series.temp, minRiseC),
+    [t, series, minRiseC],
+  );
+  const hot = timeAtOrAbove(series.temp, hotC, bucketSec);
+  const coldest = summarise(series.temp)?.min;
+  const at = (sec) => fmtTime(sec, range === '1h' || range === '6h' ? range : '7d');
+
+  return (
+    <section className="panel">
+      <h3 className="panel-title">Heating</h3>
+      <p className="panel-sub">
+        {cycles.length
+          ? `Heated ${cycles.length} time${cycles.length === 1 ? '' : 's'} over ${rangeLabel}: a climb of ${minRiseC}° or more counts.`
+          : `No climb of ${minRiseC}° or more over ${rangeLabel}.`}
+      </p>
+      <dl className="stats">
+        <div className="stat">
+          <dt>Reheats</dt>
+          <dd>{cycles.length}</dd>
+        </div>
+        <div className="stat">
+          <dt>At {hotC}°+</dt>
+          <dd>{fmtDuration(hot)}</dd>
+        </div>
+        <div className="stat">
+          <dt>Coolest</dt>
+          <dd>{coldest == null ? '—' : `${coldest.toFixed(1)}°C`}</dd>
+        </div>
+      </dl>
+      {cycles.length > 0 && (
+        <ol className="event-list heating-list">
+          {[...cycles].reverse().slice(0, 20).map((c) => (
+            <li key={c.from}>
+              <span className="event-what">{at(c.from)}</span>
+              <span className="event-when">
+                {c.startC.toFixed(1)} → {c.endC.toFixed(1)}°C
+              </span>
+              <span className="event-note">
+                +{(c.endC - c.startC).toFixed(1)}° in {fmtDuration(Math.max(c.to - c.from, bucketSec))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 function ClimateHistory(props) {
   const { reading, series, drawn, t, range, rangeLabel, color } = props;
   return (
@@ -267,6 +325,8 @@ function ClimateHistory(props) {
         />
         <Stats values={series.hum} unit="%" digits={0} />
       </section>
+
+      {reading.heating && <Heating {...props} />}
 
       <DailyClimate reading={reading} daily={props.daily} color={color} />
 
