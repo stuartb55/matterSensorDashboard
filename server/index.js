@@ -8,6 +8,7 @@ import { influxUrl, InfluxError } from './influx.js';
 import {
   fetchLatest,
   fetchHistory,
+  fetchDoorEvents,
   probeUpstream,
   publicRanges,
   RANGES,
@@ -131,6 +132,18 @@ app.get('/api/history', async (req, reply) => {
     : null;
   try {
     return await fetchHistory(range, ids);
+  } catch (err) {
+    return sendUpstreamError(reply, err, app.log);
+  }
+});
+
+app.get('/api/doors/events', async (req, reply) => {
+  const range = String(req.query.range || DEFAULT_RANGE);
+  if (!RANGES[range]) {
+    return reply.code(400).send({ error: 'bad_range', allowed: Object.keys(RANGES) });
+  }
+  try {
+    return await fetchDoorEvents(range);
   } catch (err) {
     return sendUpstreamError(reply, err, app.log);
   }

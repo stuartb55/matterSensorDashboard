@@ -109,3 +109,33 @@ test('CO2 history lands on the Ruuvi Air series only, and degrades on failure', 
   const degraded = await fetchHistory('1h');
   assert.ok(degraded.series.find((s) => s.id === 'ruuvi_air').co2.every((v) => v == null));
 });
+
+test('door rows collapse into state changes', async () => {
+  const { doorTransitions, fetchDoorEvents } = await import('../server/queries.js');
+  const t0 = Date.UTC(2026, 10, 20, 8);
+  const at = (min) => influxTime(t0 + min * 60_000);
+  const rows = [
+    { closed: 1, time: at(0) }, // repeat of the initial state: not an event
+    { closed: 0, time: at(5) },
+    { closed: 0, time: at(6) },
+    { closed: 1, time: at(9) },
+  ];
+  assert.deepEqual(doorTransitions(true, rows), [
+    { ts: t0 + 5 * 60_000, closed: false },
+    { ts: t0 + 9 * 60_000, closed: true },
+  ]);
+  // With no known prior state, the first row is an event.
+  assert.equal(doorTransitions(null, rows).length, 3);
+
+  answer(({ sql }) => {
+    if (/DISTINCT ON/.test(sql)) return [{ key: 'Garage', closed: 1, time: at(-600) }];
+    if (/contact_closed/.test(sql)) return rows.map((r) => ({ ...r, key: 'Garage' }));
+    return [];
+  });
+  const out = await fetchDoorEvents('24h');
+  const garage = out.doors.find((d) => d.id === 'garage');
+  assert.equal(garage.initial, true);
+  assert.equal(garage.events.length, 2);
+  assert.equal(out.doors.find((d) => d.id === 'back_door').initial, null);
+  assert.equal(out.end - out.start, 86400);
+});

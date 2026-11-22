@@ -247,6 +247,103 @@ async function latestDoorStates(sensors) {
   return query(src.db, sql);
 }
 
+// ---------------------------------------------------------------------------
+// Door events
+// ---------------------------------------------------------------------------
+
+/**
+ * Collapse contact rows into state changes. A contact sensor may repeat its
+ * current state (on reconnect, say), and a repeat is not an event.
+ * `initial` is the state already in force when the window opened, or null.
+ */
+export function doorTransitions(initial, rows) {
+  const events = [];
+  let state = initial;
+  for (const row of rows) {
+    if (row.closed == null) continue;
+    const closed = row.closed !== 0 && row.closed !== false;
+    if (closed === state) continue;
+    const ts = parseInfluxTime(row.time);
+    if (ts == null) continue;
+    events.push({ ts, closed });
+    state = closed;
+  }
+  return events;
+}
+
+/**
+ * Open/close history for every door over a range: the state when the window
+ * opened, then each change inside it. Doors stay out of the history contract
+ * (they are events, not a bucketed series), so they get their own shape:
+ * `{ range, start, end, doors: [{ id, label, initial, events: [{ ts, closed }] }] }`,
+ * with `start`/`end` in epoch seconds and event times in epoch milliseconds.
+ */
+export async function fetchDoorEvents(range = DEFAULT_RANGE) {
+  if (!RANGES[range]) throw new Error(`unknown range: ${range}`);
+  const { interval, spanSec, timeoutMs } = RANGES[range];
+  const doors = SENSORS.filter((s) => s.kind === 'door');
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - spanSec;
+  if (!doors.length) return { range, start, end, doors: [] };
+
+  const src = SOURCES.matter;
+  const keys = sqlList(doors.map((s) => s.key));
+  const [rows, priorRows] = await Promise.all([
+    query(
+      src.db,
+      `
+      SELECT ${src.tag} AS key, ${src.contact} AS closed, time
+      FROM ${src.table}
+      WHERE time > now() - INTERVAL '${interval}'
+        AND ${src.tag} IN (${keys})
+        AND ${src.contact} IS NOT NULL
+      ORDER BY ${src.tag}, time`,
+      { timeoutMs },
+    ),
+    // The state in force at the start of the window: the last change before
+    // it, however long ago, as latestDoorStates does for the current state.
+    query(
+      src.db,
+      `
+      SELECT DISTINCT ON (${src.tag})
+        ${src.tag} AS key, ${src.contact} AS closed, time
+      FROM ${src.table}
+      WHERE time <= now() - INTERVAL '${interval}'
+        AND ${src.tag} IN (${keys})
+        AND ${src.contact} IS NOT NULL
+      ORDER BY ${src.tag}, time DESC`,
+      { timeoutMs },
+    ),
+  ]);
+
+  const byKey = (list) => {
+    const map = new Map();
+    for (const row of list) {
+      if (!map.has(row.key)) map.set(row.key, []);
+      map.get(row.key).push(row);
+    }
+    return map;
+  };
+  const inWindow = byKey(rows);
+  const prior = byKey(priorRows);
+
+  return {
+    range,
+    start,
+    end,
+    doors: doors.map((door) => {
+      const before = prior.get(door.key)?.[0]?.closed;
+      const initial = before == null ? null : before !== 0 && before !== false;
+      return {
+        id: door.id,
+        label: door.label,
+        initial,
+        events: doorTransitions(initial, inWindow.get(door.key) ?? []),
+      };
+    }),
+  };
+}
+
 /**
  * Current reading for every registered sensor, normalised across both sources.
  * Sensors with no recent data are still returned, with null values, so the UI

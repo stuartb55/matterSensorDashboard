@@ -140,6 +140,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/sensors` | Sensor registry |
 | `GET /api/readings/latest` | Current reading per sensor, 10s server-side cache |
 | `GET /api/history?range=24h&sensors=a,b` | Bucketed series on a shared time axis |
+| `GET /api/doors/events?range=24h` | Each door's state at the start of the range and every change in it |
 | `GET /api/floorplan` | Floor layouts and sensor positions |
 | `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
 

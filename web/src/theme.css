@@ -972,3 +972,73 @@ button.marker:active {
     height: 6px;
   }
 }
+
+/* ------------------------------------------------------------ door history */
+
+.muted {
+  color: var(--text-muted);
+}
+button.door-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+button.door-card:active {
+  background: var(--ghost);
+}
+.door-indicator.is-closed {
+  background: var(--status-good);
+}
+.door-indicator.is-open {
+  background: var(--status-serious);
+}
+.door-timeline {
+  margin: 4px 4px 12px;
+}
+.door-timeline svg {
+  display: block;
+  width: 100%;
+  height: 28px;
+}
+.door-timeline-closed {
+  fill: var(--ghost);
+  stroke: var(--border);
+}
+.door-timeline-unknown {
+  fill: var(--gridline);
+}
+.door-timeline-open {
+  fill: var(--status-serious);
+}
+.door-timeline-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+}
+.event-list li {
+  display: grid;
+  grid-template-columns: 12px 4.5rem 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--gridline);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.event-list li:last-child {
+  border-bottom: none;
+}
+.event-when {
+  color: var(--text-secondary);
+}
+.event-note {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}

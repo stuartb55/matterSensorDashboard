@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
+import Sheet, { CloseButton } from './Sheet.jsx';
 import TimeChart from './TimeChart.jsx';
 import TableView from './TableView.jsx';
 import { seriesColor } from '../palette.js';
@@ -212,7 +213,6 @@ export default function DetailSheet({
   onClose,
 }) {
   const [showTable, setShowTable] = useState(false);
-  const sheetRef = useRef(null);
   const color = seriesColor(reading.id, getComputedStyle(document.documentElement));
 
   // Bridged copies are for drawing only; statistics and the table below use the
@@ -233,39 +233,13 @@ export default function DetailSheet({
     };
   }, [series, bucketSec]);
 
-  // Close on Escape, and keep focus inside the sheet while it's open.
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    sheetRef.current?.focus();
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
-    };
-  }, [onClose]);
-
   const hasHistory = series && t.length > 0;
   const battery = fmtBattery(reading.battery, reading.batteryKind);
   const power = fmtPower(reading.watts);
   const historyProps = { reading, series, drawn, t, bucketSec, range, rangeLabel, color };
 
   return (
-    <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <div
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${reading.label} detail`}
-        ref={sheetRef}
-        tabIndex={-1}
-      >
-        <div className="grabber" aria-hidden="true" />
-
+    <Sheet label={`${reading.label} detail`} onClose={onClose}>
         <div className="sheet-head">
           <div>
             <h2>{reading.label}</h2>
@@ -288,16 +262,7 @@ export default function DetailSheet({
               {battery && ` · battery ${battery}`}
             </div>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-              <path
-                d="M5 5l10 10M15 5L5 15"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+<CloseButton onClose={onClose} />
         </div>
 
         {!hasHistory ? (
@@ -339,7 +304,6 @@ export default function DetailSheet({
             </div>
           </div>
         )}
-      </div>
-    </>
+    </Sheet>
   );
 }

@@ -78,7 +78,10 @@ that have gone quiet — sensors never vanish from the UI.
 epoch-anchored axis (matching `date_bin`) and every series is padded to its full
 length with **nulls, not zeros**. Each climate series also carries `bridgeSec`
 — the longest silence that is normal for that sensor. Door contacts are
-event-driven state, not climate series, so they are deliberately excluded.
+event-driven state, not climate series, so they are deliberately excluded;
+`fetchDoorEvents()` (`/api/doors/events`) gives them their own shape instead:
+the state in force when the range opened plus each change, with repeats of
+the same state collapsed by `doorTransitions()`.
 The whole frontend assumes this shared axis; charts, sparklines and tables index
 into it directly.
 
