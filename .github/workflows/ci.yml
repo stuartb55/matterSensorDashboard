@@ -75,6 +75,9 @@ jobs:
           echo "outdoor weather is off when no location is configured"
           curl -sf http://127.0.0.1:8090/api/weather | grep -q '"enabled":false'
 
+          echo "heating gas is off when no Octopus account is configured"
+          curl -sf http://127.0.0.1:8090/api/gas | grep -q '"enabled":false'
+
           echo "unknown API paths 404 instead of falling back to the shell"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/api/nope)" = 404
 

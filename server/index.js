@@ -22,6 +22,7 @@ import { floorplan } from './floorplan.js';
 import { cacheLongHistory } from './history-cache.js';
 import { fetchLights, HueError } from './hue.js';
 import { fetchWeather, WeatherError } from './weather.js';
+import { fetchGas, GasError } from './octopus.js';
 import { fetchLightHistory, lightHistoryEnabled, startRecorder } from './hue-history.js';
 
 const PORT = Number(process.env.PORT || 8090);
@@ -155,6 +156,18 @@ app.get('/api/weather', async (_req, reply) => {
     app.log.error({ err: err.message }, 'weather request failed');
     const status = err instanceof WeatherError ? err.status : 500;
     return reply.code(status).send({ error: 'weather_unavailable', message: err.message });
+  }
+});
+
+// Half-hourly heating gas from the smart meter, through Octopus Energy;
+// cached inside octopus.js for an hour, since readings arrive once a day.
+app.get('/api/gas', async (_req, reply) => {
+  try {
+    return await fetchGas();
+  } catch (err) {
+    app.log.error({ err: err.message }, 'gas request failed');
+    const status = err instanceof GasError ? err.status : 500;
+    return reply.code(status).send({ error: 'gas_unavailable', message: err.message });
   }
 });
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { registerSlots } from './palette.js';
-import { getFloorplan, getHistory, getLatest, getLights, getDaily, getSensors, getWeather } from './api.js';
+import { getFloorplan, getGas, getHistory, getLatest, getLights, getDaily, getSensors, getWeather } from './api.js';
 import { fmtAge, fmtDuration, fmtHum, fmtTemp } from './format.js';
 import SensorCard from './components/SensorCard.jsx';
 import DoorCard from './components/DoorCard.jsx';
@@ -8,6 +8,7 @@ import PowerCard from './components/PowerCard.jsx';
 import LightCard from './components/LightCard.jsx';
 import CompareChart from './components/CompareChart.jsx';
 import OutsideChart from './components/OutsideChart.jsx';
+import GasPanel from './components/GasPanel.jsx';
 import DetailSheet from './components/DetailSheet.jsx';
 import DoorSheet from './components/DoorSheet.jsx';
 import LightSheet from './components/LightSheet.jsx';
@@ -15,6 +16,9 @@ import FloorPlan from './components/FloorPlan.jsx';
 
 const LATEST_POLL_MS = 30_000;
 const HISTORY_POLL_MS = 120_000;
+// Smart meter gas readings arrive once a day; the server caches them for an hour.
+const GAS_POLL_MS = 30 * 60_000;
+const DAILY_TTL_MS = 10 * 60_000;
 
 /**
  * One line per feed that has gone quiet as a whole, so an upstream outage
@@ -173,6 +177,8 @@ export default function App() {
   const dailyAt = useRef(0);
   // Outdoor reference, or null when no location is configured.
   const [weather, setWeather] = useState(null);
+  // Heating gas from the smart meter, or null when Octopus isn't set up.
+  const [gas, setGas] = useState(null);
   const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
   const [refetching, setRefetching] = useState(false);
@@ -326,19 +332,47 @@ export default function App() {
     };
   }, [loadLatest, loadHistory]);
 
-  useEffect(() => {
-    if (!selected || Date.now() - dailyAt.current < 10 * 60_000) return;
-    const ac = new AbortController();
-    getDaily(ac.signal)
+  const loadDaily = useCallback((signal) => {
+    if (Date.now() - dailyAt.current < DAILY_TTL_MS) return;
+    getDaily(signal)
       .then((data) => {
         dailyAt.current = Date.now();
         setDaily(data);
       })
       .catch(() => {
-        /* calendar-day panels are extras; the sheet works without them */
+        /* calendar-day panels are extras; everything works without them */
       });
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return undefined;
+    const ac = new AbortController();
+    loadDaily(ac.signal);
     return () => ac.abort();
-  }, [selected]);
+  }, [selected, loadDaily]);
+
+  // Gas is fetched on its own slow schedule. Its per-degree figure needs the
+  // rooms' daily means, so the calendar-day data comes with it.
+  useEffect(() => {
+    const ac = new AbortController();
+    const load = () => {
+      if (document.hidden) return;
+      getGas(ac.signal)
+        .then((data) => {
+          setGas(data.enabled ? data : null);
+          if (data.enabled) loadDaily(ac.signal);
+        })
+        .catch(() => {
+          /* the gas panel is optional; it just stays out */
+        });
+    };
+    load();
+    const timer = setInterval(load, GAS_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      ac.abort();
+    };
+  }, [loadDaily]);
 
   const seriesById = useMemo(() => {
     const map = new Map();
@@ -540,13 +574,13 @@ export default function App() {
             </>
           )}
 
-          {meters.length > 0 && (
+          {(meters.length > 0 || (gas && !wall)) && (
             <>
               <div className="section-head">
                 <h2>Energy</h2>
                 <OfflineNote count={metersOffline} />
               </div>
-              <div className="grid">
+              {meters.length > 0 && <div className="grid">
                 {meters.map((r) => (
                   <PowerCard
                     key={r.id}
@@ -557,7 +591,8 @@ export default function App() {
                     onOpen={setSelected}
                   />
                 ))}
-              </div>
+              </div>}
+              {gas && !wall && <GasPanel gas={gas} daily={daily} weather={weather} />}
             </>
           )}
 
