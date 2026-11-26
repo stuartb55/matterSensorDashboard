@@ -149,16 +149,26 @@ async function consumption(mprn, serial, fromIso) {
 async function lookupTariff(tariffCode) {
   const product = productOf(tariffCode);
   if (!product) return null;
-  const at = new Date().toISOString();
+  const now = Date.now();
+  // period_from alone: Octopus refuses a period_to equal to period_from (400).
+  const at = new Date(now).toISOString();
   const path = (kind) =>
-    `/v1/products/${encodeURIComponent(product)}/gas-tariffs/${encodeURIComponent(tariffCode)}/${kind}/?period_from=${at}&period_to=${at}`;
+    `/v1/products/${encodeURIComponent(product)}/gas-tariffs/${encodeURIComponent(tariffCode)}/${kind}/?period_from=${at}`;
   // Product prices are public, so no key goes with these.
   const [rates, standing] = await Promise.all([
     getJson(path('standard-unit-rates'), 'gas unit rate', { auth: false }),
     getJson(path('standing-charges'), 'gas standing charge', { auth: false }),
   ]);
+  // The price in force now; results can include a later price change too.
   const pence = (body) => {
-    const v = body?.results?.[0]?.value_inc_vat;
+    const list = Array.isArray(body?.results) ? body.results : [];
+    const live =
+      list.find(
+        (r) =>
+          (!r.valid_from || Date.parse(r.valid_from) <= now) &&
+          (!r.valid_to || Date.parse(r.valid_to) > now),
+      ) ?? list[0];
+    const v = live?.value_inc_vat;
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
   };
   const rate = pence(rates);
@@ -191,7 +201,7 @@ async function findMeter(fromIso) {
   throw new GasError('no gas meter on the account has returned any readings', 502);
 }
 
-async function load() {
+async function load(log) {
   const fromIso = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString();
   let rows;
   if (meter) {
@@ -212,7 +222,8 @@ async function load() {
   if (!tariff && meter.tariffCode) {
     try {
       tariff = await lookupTariff(meter.tariffCode);
-    } catch {
+    } catch (err) {
+      log?.warn({ err: err.message }, 'gas tariff lookup failed');
       tariff = null; // costs are an extra; the readings still show
     }
   }
@@ -229,11 +240,11 @@ async function load() {
 
 let cache = { at: 0, data: null, inflight: null };
 
-export async function fetchGas() {
+export async function fetchGas(log) {
   if (!gasEnabled) return { enabled: false };
   if (cache.data && Date.now() - cache.at < TTL_MS) return cache.data;
   if (!cache.inflight) {
-    cache.inflight = load()
+    cache.inflight = load(log)
       .then((data) => {
         cache = { at: Date.now(), data, inflight: null };
         return data;

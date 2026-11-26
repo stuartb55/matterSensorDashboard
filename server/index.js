@@ -163,7 +163,7 @@ app.get('/api/weather', async (_req, reply) => {
 // cached inside octopus.js for an hour, since readings arrive once a day.
 app.get('/api/gas', async (_req, reply) => {
   try {
-    return await fetchGas();
+    return await fetchGas(app.log);
   } catch (err) {
     app.log.error({ err: err.message }, 'gas request failed');
     const status = err instanceof GasError ? err.status : 500;
