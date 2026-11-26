@@ -22,9 +22,12 @@ test('publicRanges lists every preset with a label', () => {
   for (const r of ranges) assert.ok(r.label && r.spanSec > 0);
 });
 
-test('fetchHistory pads every series to a shared epoch-anchored axis with nulls', async () => {
+test('fetchHistory pads every series to a shared epoch-anchored axis with nulls', async (t) => {
   const { bucketSec } = RANGES['1h'];
+  // Hold the clock mid-bucket, so a run that straddles a bucket boundary
+  // can't build the axis one bucket later than the expectation below.
   const lastBucket = Math.floor(Date.now() / 1000 / bucketSec) * bucketSec;
+  t.mock.method(Date, 'now', () => (lastBucket + bucketSec / 2) * 1000);
   answer(({ db, sql }) => {
     if (db === 'ruuvi' && /date_bin/.test(sql) && /temp_lo/.test(sql)) {
       return [{ bucket: influxTime(lastBucket * 1000), key: 'Office', temp: 21.5, temp_lo: 21.4, temp_hi: 21.6, hum: 40 }];
