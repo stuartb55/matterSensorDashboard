@@ -206,6 +206,23 @@ flattened. Up to 92 days of outdoor history is available. Two decimal places
 of latitude and longitude (about 1 km) are plenty; the coordinates are sent
 only to Open-Meteo, never to the browser.
 
+## Heating gas
+
+With `OCTOPUS_API_KEY` and `OCTOPUS_ACCOUNT` set in `.env`, the Energy section
+adds a **Heating gas** panel: gas per local day for the last 30 days from the
+smart meter's half-hourly readings, the latest full day and the last 7 days
+with their cost and the change on the week before, and **Gas per degree**,
+each day's gas divided by how much warmer the rooms were than outside. That
+last figure takes most of the weather out, so it is the one to watch after
+changing the thermostat, the radiator valves or the boiler's flow temperature.
+
+Readings reach Octopus about a day late, so the server asks at most once an
+hour. SMETS2 meters report cubic metres, converted at the standard factor with
+`GAS_CALORIFIC_VALUE` (MJ/m³, 39.5 unless your bill says otherwise); set
+`GAS_UNITS=kwh` for a SMETS1 meter. Prices come from the account's current
+gas tariff, or from `GAS_PRICE` and `GAS_STANDING` if set. The key, account
+number, meter point and serial stay on the server.
+
 ## CI and dependencies
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
@@ -238,6 +255,7 @@ checks, with a bypass for the repo admin so direct pushes still work.
 | `GET /api/weather` | Outdoor temperature and humidity from Open-Meteo, 15 min cache |
 | `GET /api/daily` | 31 days of hourly buckets for calendar-day views, plus the energy tariff, 10 min cache |
 | `GET /api/lights` | Hue lights grouped by room, 10s server-side cache |
+| `GET /api/gas` | Half-hourly heating gas in kWh and the gas tariff, from Octopus Energy, 1 hour cache |
 
 Ranges are allowlisted: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`, `1y`. The two
 long ones use 12-hour and daily buckets and a longer query timeout; how far

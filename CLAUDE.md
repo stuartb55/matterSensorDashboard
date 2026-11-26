@@ -35,7 +35,7 @@ against the live database too. There is no linter or formatter.
 
 CI (`.github/workflows/ci.yml`) runs the unit tests, builds the frontend,
 boots the server against a closed port and asserts what holds without InfluxDB
-(registry, static build, 503 health, API 404, example floor plan, Hue off), then
+(registry, static build, 503 health, API 404, example floor plan, Hue, weather and gas off), then
 builds the image. Reproduce it locally with `npm run build`
 plus the smoke block from that file. If you add a job, add its `name` to the
 required checks in the `main` ruleset or Renovate will merge past it.
@@ -125,6 +125,18 @@ reads it with `WEATHER_LAT`/`WEATHER_LON` from `.env` (off when unset), keeps
 only hours already past, and caches for 15 minutes. It is a reference, not a
 sensor: it never joins the room comparison (it would flatten it), and draws in
 neutral ink, dashed, on its own Inside and outside chart.
+
+**Heating gas comes from Octopus Energy, not InfluxDB.** `server/octopus.js`
+reads half-hourly smart meter consumption with `OCTOPUS_API_KEY` and
+`OCTOPUS_ACCOUNT` from `.env` (off when either is unset), works out once which
+meter on the account returns readings, converts m³ to kWh (`GAS_UNITS`,
+`GAS_CALORIFIC_VALUE`), prices it from the account's current tariff unless
+`GAS_PRICE`/`GAS_STANDING` override it, and caches for an hour. It is the only
+module holding the key, and `/api/gas` carries no account number, meter point
+or serial; error messages never include request URLs for the same reason.
+`web/src/gas.js` regroups it into local days and divides each day's gas by
+the indoor-outdoor gap (rooms from `/api/daily`, outside from Open-Meteo), so
+`GasPanel.jsx` can show whether a change to the heating worked.
 
 **Frontend state lives in `App.jsx`.** It owns the selected range and both
 polling loops (latest every 30s, history every 120s), pauses them on
