@@ -52,7 +52,20 @@ globalThis.fetch = async (url, init = {}) => {
       ],
     });
   }
-  if (u.pathname.endsWith('/standard-unit-rates/')) return json({ results: [{ value_inc_vat: 7.11018 }] });
+  if (u.pathname.startsWith('/v1/products/')) {
+    // Octopus answers 400 when period_to is not after period_from.
+    const from = u.searchParams.get('period_from');
+    const to = u.searchParams.get('period_to');
+    if (to != null && Date.parse(to) <= Date.parse(from)) return json({ period_from: ['Must not be greater than period_to'] }, 400);
+  }
+  if (u.pathname.endsWith('/standard-unit-rates/')) {
+    return json({
+      results: [
+        { value_inc_vat: 8.5, valid_from: iso(NOW + 30 * 86_400_000), valid_to: null },
+        { value_inc_vat: 7.11018, valid_from: iso(NOW - 30 * 86_400_000), valid_to: iso(NOW + 30 * 86_400_000) },
+      ],
+    });
+  }
   if (u.pathname.endsWith('/standing-charges/')) return json({ results: [{ value_inc_vat: 29.02998 }] });
   return json({ detail: 'not found' }, 404);
 };
